@@ -46,6 +46,7 @@ func (w *WebUI) Start() error {
 	mux.HandleFunc("/api/payload/generate", w.handlePayloadGenerate)
 	mux.HandleFunc("/api/payload/types", w.handlePayloadTypes)
 	mux.HandleFunc("/api/payload/apps", w.handlePayloadAppTemplates)
+	mux.HandleFunc("/api/payload/download", w.handlePayloadDownload)
 
 	httpServer := &http.Server{
 		Addr:         w.bindAddr,

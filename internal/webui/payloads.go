@@ -271,6 +271,58 @@ func setEnvVar(env []string, key, value string) []string {
 	return append(env, prefix+value)
 }
 
+// handlePayloadDownload serves a generated payload file for browser download.
+func (w *WebUI) handlePayloadDownload(rw http.ResponseWriter, r *http.Request) {
+	filePath := r.URL.Query().Get("file")
+	if filePath == "" {
+		http.Error(rw, "file parameter required", 400)
+		return
+	}
+
+	// Security: only allow downloads from build/ directory
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		http.Error(rw, "invalid path", 400)
+		return
+	}
+	buildDir, _ := filepath.Abs("build")
+	if !strings.HasPrefix(absPath, buildDir) {
+		http.Error(rw, "access denied", 403)
+		return
+	}
+
+	// Check file exists
+	info, err := os.Stat(absPath)
+	if err != nil {
+		http.Error(rw, "file not found", 404)
+		return
+	}
+
+	// Set download headers
+	filename := filepath.Base(absPath)
+	rw.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+	rw.Header().Set("Content-Length", fmt.Sprintf("%d", info.Size()))
+
+	// Set content type based on extension
+	ext := strings.ToLower(filepath.Ext(filename))
+	switch ext {
+	case ".exe":
+		rw.Header().Set("Content-Type", "application/x-msdownload")
+	case ".php", ".jsp", ".aspx", ".py", ".sh", ".ps1", ".vba", ".hta":
+		rw.Header().Set("Content-Type", "text/plain")
+	case ".html":
+		rw.Header().Set("Content-Type", "text/html")
+	case ".xml":
+		rw.Header().Set("Content-Type", "application/xml")
+	case ".mobileconfig":
+		rw.Header().Set("Content-Type", "application/x-apple-aspen-config")
+	default:
+		rw.Header().Set("Content-Type", "application/octet-stream")
+	}
+
+	http.ServeFile(rw, r, absPath)
+}
+
 func findRoot() string {
 	dir, _ := os.Getwd()
 	for {

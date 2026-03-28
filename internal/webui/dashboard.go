@@ -1107,10 +1107,26 @@ async function generatePayload() {
       if (data.size) details += '<div style="margin-bottom:6px;"><span style="color:var(--text-muted);font-size:11px;">SIZE:</span> <span style="color:var(--blue);">'+data.size+'</span></div>';
       details += '<div style="margin-bottom:6px;"><span style="color:var(--text-muted);font-size:11px;">TYPE:</span> <span>'+data.type+'</span></div>';
       details += '<div style="margin-bottom:6px;"><span style="color:var(--text-muted);font-size:11px;">CALLBACK:</span> <span>'+url+'</span></div>';
+
+      // Download button
+      if (data.filepath) {
+        details += '<div style="margin-top:12px;"><a href="/api/payload/download?file='+encodeURIComponent(data.filepath)+'" class="btn" style="text-decoration:none;display:inline-block;padding:10px 20px;">Download '+( data.filename || 'Payload' )+'</a></div>';
+      }
+
       if (data.message) {
         details += '<div style="margin-top:12px;padding:10px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.2);border-radius:6px;font-size:12px;color:var(--green);white-space:pre-wrap;">'+data.message+'</div>';
       }
       output.innerHTML = details;
+
+      // Auto-download the file
+      if (data.filepath) {
+        const a = document.createElement('a');
+        a.href = '/api/payload/download?file=' + encodeURIComponent(data.filepath);
+        a.download = data.filename || 'payload';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
     } else {
       output.innerHTML = '<div style="color:var(--red);font-weight:600;">Generation Failed</div><div style="margin-top:8px;color:var(--text-muted);font-size:12px;">'+data.message+'</div>';
     }
