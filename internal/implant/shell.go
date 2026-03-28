@@ -21,7 +21,8 @@ func ExecuteShell(args []string) ([]byte, error) {
 
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
-		cmd = exec.CommandContext(ctx, "cmd.exe", "/C", command)
+		cmd = exec.CommandContext(ctx, "cmd.exe")
+		cmd.SysProcAttr = windowsCmdLine("cmd.exe /S /C \"" + command + "\"")
 	} else {
 		cmd = exec.CommandContext(ctx, "/bin/sh", "-c", command)
 	}
