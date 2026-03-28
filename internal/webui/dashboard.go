@@ -587,8 +587,8 @@ tr.clickable { cursor: pointer; }
               <button class="qbtn" onclick="browseDir('/home')">home</button>
               <button class="qbtn" onclick="browseDir('/etc')">etc</button>
               <button class="qbtn" onclick="browseDir('/tmp')">tmp</button>
-              <button class="qbtn" onclick="browseDir('C:\\\\Users')">C:\\Users</button>
-              <button class="qbtn" onclick="browseDir('C:\\\\Windows')">C:\\Windows</button>
+              <button class="qbtn" onclick="browseDir('C:\\Users')">C:\Users</button>
+              <button class="qbtn" onclick="browseDir('C:\\Windows')">C:\Windows</button>
             </div>
             <div id="fb-output" style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:12px;min-height:200px;max-height:350px;overflow-y:auto;font-family:monospace;font-size:12px;color:var(--text-muted);white-space:pre-wrap;">
               Select an agent and path, then click Browse.
@@ -1171,7 +1171,7 @@ async function browseFiles() {
       await new Promise(r => setTimeout(r, 3000));
       const detail = await fetchJ('/api/agent/' + agent);
       if (detail.tasks && detail.tasks.length > 0) {
-        const task = detail.tasks.find(t => data.task_id.startsWith(t.id));
+        const task = detail.tasks.find(t => data.task_id.startsWith(t.id) || t.id.startsWith(data.task_id.substring(0,8)));
         if (task && task.output && task.status !== 'pending' && task.status !== 'sent') {
           output.innerHTML = '<span style="color:var(--green)">$ ls -la ' + path + '</span>\n\n' + task.output;
           return;
@@ -1215,7 +1215,7 @@ async function requestProcessList() {
       await new Promise(r => setTimeout(r, 3000));
       const detail = await fetchJ('/api/agent/' + agent);
       if (detail.tasks && detail.tasks.length > 0) {
-        const task = detail.tasks.find(t => data.task_id.startsWith(t.id));
+        const task = detail.tasks.find(t => data.task_id.startsWith(t.id) || t.id.startsWith(data.task_id.substring(0,8)));
         if (task && task.output && task.status !== 'pending' && task.status !== 'sent') {
           output.innerHTML = '<span style="color:var(--green)">$ ps aux</span>\n\n' + task.output;
           return;

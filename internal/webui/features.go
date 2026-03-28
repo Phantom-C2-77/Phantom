@@ -184,7 +184,7 @@ func (w *WebUI) handleFileBrowser(rw http.ResponseWriter, r *http.Request) {
 	// Queue a directory listing command
 	var cmd string
 	if agent.OS == "windows" {
-		cmd = fmt.Sprintf("dir /b /a \"%s\"", path)
+		cmd = fmt.Sprintf("dir \"%s\"", path)
 	} else {
 		cmd = fmt.Sprintf("ls -la %s", path)
 	}
