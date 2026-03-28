@@ -69,6 +69,17 @@ func (db *Database) migrate() error {
 			FOREIGN KEY (task_id) REFERENCES tasks(id)
 		)`,
 
+		`CREATE TABLE IF NOT EXISTS listener_presets (
+			id         TEXT PRIMARY KEY,
+			name       TEXT NOT NULL UNIQUE,
+			type       TEXT NOT NULL DEFAULT 'http',
+			bind_addr  TEXT NOT NULL,
+			profile    TEXT NOT NULL DEFAULT 'default',
+			tls_cert   TEXT DEFAULT '',
+			tls_key    TEXT DEFAULT '',
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)`,
+
 		`CREATE INDEX IF NOT EXISTS idx_tasks_agent_status ON tasks(agent_id, status)`,
 		`CREATE INDEX IF NOT EXISTS idx_loot_agent ON loot(agent_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_task_results_agent ON task_results(agent_id)`,

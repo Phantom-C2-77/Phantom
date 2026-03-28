@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/phantom-c2/phantom/internal/db"
 	"github.com/phantom-c2/phantom/internal/protocol"
 )
 
@@ -195,10 +197,12 @@ func (w *WebUI) handleFileBrowser(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(rw, map[string]string{
+	writeJSON(rw, map[string]interface{}{
 		"status":  "queued",
 		"task_id": task.ID,
 		"path":    path,
+		"os":      agent.OS,
+		"cmd":     cmd,
 		"message": "Directory listing queued. Check results in a few seconds.",
 	})
 }
@@ -261,5 +265,176 @@ func (w *WebUI) handleProcessList(rw http.ResponseWriter, r *http.Request) {
 		"task_id": task.ID,
 		"message": "Process list requested. Results on next check-in.",
 	})
+}
+
+// ══════════════════════════════════════════
+//  LISTENER MANAGEMENT
+// ══════════════════════════════════════════
+
+func (w *WebUI) handleListenerCreate(rw http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(rw, "POST required", 405)
+		return
+	}
+
+	var req struct {
+		Name    string `json:"name"`
+		Type    string `json:"type"`
+		Bind    string `json:"bind"`
+		Profile string `json:"profile"`
+		Save    bool   `json:"save"` // also save as preset
+	}
+	json.NewDecoder(r.Body).Decode(&req)
+
+	if req.Name == "" || req.Bind == "" {
+		writeJSON(rw, map[string]string{"error": "name and bind are required"})
+		return
+	}
+	if req.Type == "" {
+		req.Type = "http"
+	}
+	if req.Profile == "" {
+		req.Profile = "default"
+	}
+
+	// Create and start the listener
+	if err := w.server.CreateListener(req.Name, req.Type, req.Bind, req.Profile, "", ""); err != nil {
+		writeJSON(rw, map[string]string{"error": err.Error()})
+		return
+	}
+
+	if err := w.server.StartListener(req.Name); err != nil {
+		writeJSON(rw, map[string]string{"error": "created but failed to start: " + err.Error()})
+		return
+	}
+
+	// Optionally save as preset
+	if req.Save {
+		p := &db.ListenerPreset{
+			ID: uuid.New().String(), Name: req.Name, Type: req.Type,
+			BindAddr: req.Bind, Profile: req.Profile, CreatedAt: time.Now(),
+		}
+		w.server.DB.InsertPreset(p)
+	}
+
+	writeJSON(rw, map[string]string{"status": "started", "name": req.Name})
+}
+
+func (w *WebUI) handleListenerAction(rw http.ResponseWriter, r *http.Request) {
+	name := r.URL.Query().Get("name")
+	if name == "" {
+		writeJSON(rw, map[string]string{"error": "name parameter required"})
+		return
+	}
+
+	action := "start"
+	if strings.HasSuffix(r.URL.Path, "/stop") {
+		action = "stop"
+	}
+
+	var err error
+	if action == "start" {
+		err = w.server.StartListener(name)
+	} else {
+		err = w.server.StopListener(name)
+	}
+
+	if err != nil {
+		writeJSON(rw, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(rw, map[string]string{"status": action + "ed", "name": name})
+}
+
+// ══════════════════════════════════════════
+//  LISTENER PRESETS
+// ══════════════════════════════════════════
+
+func (w *WebUI) handlePresets(rw http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		presets, err := w.server.DB.ListPresets()
+		if err != nil {
+			writeJSON(rw, []interface{}{})
+			return
+		}
+
+		type presetResp struct {
+			Name    string `json:"name"`
+			Type    string `json:"type"`
+			Bind    string `json:"bind"`
+			Profile string `json:"profile"`
+		}
+		var resp []presetResp
+		for _, p := range presets {
+			resp = append(resp, presetResp{
+				Name: p.Name, Type: p.Type, Bind: p.BindAddr, Profile: p.Profile,
+			})
+		}
+		if resp == nil {
+			resp = []presetResp{}
+		}
+		writeJSON(rw, resp)
+		return
+	}
+
+	if r.Method == "POST" {
+		var req struct {
+			Action  string `json:"action"` // save, delete, use
+			Name    string `json:"name"`
+			Type    string `json:"type"`
+			Bind    string `json:"bind"`
+			Profile string `json:"profile"`
+		}
+		json.NewDecoder(r.Body).Decode(&req)
+
+		switch req.Action {
+		case "save":
+			if req.Name == "" || req.Bind == "" {
+				writeJSON(rw, map[string]string{"error": "name and bind are required"})
+				return
+			}
+			if req.Type == "" {
+				req.Type = "http"
+			}
+			if req.Profile == "" {
+				req.Profile = "default"
+			}
+			p := &db.ListenerPreset{
+				ID: uuid.New().String(), Name: req.Name, Type: req.Type,
+				BindAddr: req.Bind, Profile: req.Profile, CreatedAt: time.Now(),
+			}
+			if err := w.server.DB.InsertPreset(p); err != nil {
+				writeJSON(rw, map[string]string{"error": err.Error()})
+				return
+			}
+			writeJSON(rw, map[string]string{"status": "saved"})
+
+		case "delete":
+			if err := w.server.DB.DeletePreset(req.Name); err != nil {
+				writeJSON(rw, map[string]string{"error": err.Error()})
+				return
+			}
+			writeJSON(rw, map[string]string{"status": "deleted"})
+
+		case "use":
+			preset, err := w.server.DB.GetPresetByName(req.Name)
+			if err != nil || preset == nil {
+				writeJSON(rw, map[string]string{"error": "preset not found"})
+				return
+			}
+			if err := w.server.CreateListener(preset.Name, preset.Type, preset.BindAddr, preset.Profile, preset.TLSCert, preset.TLSKey); err != nil {
+				writeJSON(rw, map[string]string{"error": err.Error()})
+				return
+			}
+			if err := w.server.StartListener(preset.Name); err != nil {
+				writeJSON(rw, map[string]string{"error": "created but failed to start: " + err.Error()})
+				return
+			}
+			writeJSON(rw, map[string]string{"status": "started", "name": preset.Name})
+
+		default:
+			writeJSON(rw, map[string]string{"error": "action must be save, delete, or use"})
+		}
+	}
 }
 

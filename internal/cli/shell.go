@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/peterh/liner"
 	"github.com/phantom-c2/phantom/internal/agent"
 	"github.com/phantom-c2/phantom/internal/listener"
@@ -582,8 +583,97 @@ func (sh *Shell) cmdListeners(args []string) {
 		} else {
 			Success("Listener %s stopped", args[1])
 		}
+	case "add":
+		// listeners add <name> <type> <bind> [profile]
+		if len(args) < 4 {
+			Error("Usage: listeners add <name> <http|https> <bind-addr> [profile]")
+			Info("  Example: listeners add my-http http 0.0.0.0:8443")
+			Info("  Example: listeners add my-https https 0.0.0.0:443 microsoft")
+			return
+		}
+		name := args[1]
+		typ := strings.ToLower(args[2])
+		bind := args[3]
+		profile := "default"
+		if len(args) > 4 {
+			profile = args[4]
+		}
+		if err := sh.server.CreateListener(name, typ, bind, profile, "", ""); err != nil {
+			Error("Failed to create listener: %v", err)
+		} else {
+			Success("Listener '%s' created (%s on %s, profile: %s)", name, typ, bind, profile)
+			Info("Use 'listeners start %s' to start it", name)
+		}
+	case "save":
+		// listeners save <name> <type> <bind> [profile] — save as preset
+		if len(args) < 4 {
+			Error("Usage: listeners save <name> <http|https> <bind-addr> [profile]")
+			Info("  Example: listeners save lab-http http 172.20.41.154:8080")
+			Info("  Saved presets persist across restarts")
+			return
+		}
+		name := args[1]
+		typ := strings.ToLower(args[2])
+		bind := args[3]
+		profile := "default"
+		if len(args) > 4 {
+			profile = args[4]
+		}
+		p := &db.ListenerPreset{
+			ID: uuid.New().String(), Name: name, Type: typ,
+			BindAddr: bind, Profile: profile, CreatedAt: time.Now(),
+		}
+		if err := sh.server.DB.InsertPreset(p); err != nil {
+			Error("Failed to save preset: %v", err)
+		} else {
+			Success("Preset '%s' saved (%s %s, profile: %s)", name, typ, bind, profile)
+		}
+	case "presets":
+		presets, err := sh.server.DB.ListPresets()
+		if err != nil || len(presets) == 0 {
+			Warn("No saved presets")
+			Info("Save one: listeners save <name> <http|https> <bind>")
+			return
+		}
+		t := NewTable("Name", "Type", "Bind Address", "Profile")
+		for _, p := range presets {
+			t.AddRow(p.Name, strings.ToUpper(p.Type), p.BindAddr, p.Profile)
+		}
+		fmt.Println()
+		t.Render()
+	case "use":
+		// listeners use <preset-name> — create + start listener from preset
+		if len(args) < 2 {
+			Error("Usage: listeners use <preset-name>")
+			return
+		}
+		preset, err := sh.server.DB.GetPresetByName(args[1])
+		if err != nil || preset == nil {
+			Error("Preset '%s' not found. Run 'listeners presets' to see saved presets", args[1])
+			return
+		}
+		if err := sh.server.CreateListener(preset.Name, preset.Type, preset.BindAddr, preset.Profile, preset.TLSCert, preset.TLSKey); err != nil {
+			Error("Failed to create listener from preset: %v", err)
+			return
+		}
+		if err := sh.server.StartListener(preset.Name); err != nil {
+			Error("Listener created but failed to start: %v", err)
+			return
+		}
+		Success("Listener '%s' started from preset (%s on %s)", preset.Name, preset.Type, preset.BindAddr)
+	case "unsave":
+		if len(args) < 2 {
+			Error("Usage: listeners unsave <preset-name>")
+			return
+		}
+		if err := sh.server.DB.DeletePreset(args[1]); err != nil {
+			Error("Failed to remove preset: %v", err)
+		} else {
+			Success("Preset '%s' removed", args[1])
+		}
 	default:
-		Error("Unknown action: %s (use: start, stop)", action)
+		Error("Unknown action: %s", action)
+		Info("Usage: listeners [start|stop|add|save|presets|use|unsave]")
 	}
 }
 

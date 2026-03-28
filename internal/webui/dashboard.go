@@ -382,12 +382,61 @@ tr.clickable { cursor: pointer; }
 
     <!-- ══════ LISTENERS ══════ -->
     <div id="p-listeners" class="page">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
+
+        <!-- Active Listeners -->
+        <div class="card">
+          <div class="card-header"><h3><span>📡</span> Active Listeners</h3></div>
+          <div class="card-body"><table>
+            <thead><tr><th>Name</th><th>Type</th><th>Bind Address</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="all-listeners"></tbody>
+          </table></div>
+        </div>
+
+        <!-- Saved Presets -->
+        <div class="card">
+          <div class="card-header"><h3><span>💾</span> Saved Presets</h3></div>
+          <div class="card-body">
+            <div id="presets-list" style="margin-bottom:12px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Create / Save New Listener -->
       <div class="card">
-        <div class="card-header"><h3><span>📡</span> Listeners</h3></div>
-        <div class="card-body"><table>
-          <thead><tr><th>Name</th><th>Type</th><th>Bind Address</th><th>Status</th></tr></thead>
-          <tbody id="all-listeners"></tbody>
-        </table></div>
+        <div class="card-header"><h3><span>➕</span> Create Listener</h3></div>
+        <div class="card-body padded">
+          <div style="display:grid;grid-template-columns:1fr 1fr 2fr 1fr;gap:10px;align-items:end;">
+            <div>
+              <label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Name</label>
+              <input type="text" id="ln-name" placeholder="my-listener" style="width:100%;padding:8px 10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;">
+            </div>
+            <div>
+              <label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Type</label>
+              <select id="ln-type" style="width:100%;padding:8px 10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;">
+                <option value="http">HTTP</option>
+                <option value="https">HTTPS</option>
+              </select>
+            </div>
+            <div>
+              <label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Bind Address</label>
+              <input type="text" id="ln-bind" placeholder="0.0.0.0:8080" style="width:100%;padding:8px 10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;font-family:monospace;">
+            </div>
+            <div>
+              <label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Profile</label>
+              <select id="ln-profile" style="width:100%;padding:8px 10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;">
+                <option value="default">Default</option>
+                <option value="microsoft">Microsoft 365</option>
+                <option value="cloudflare">Cloudflare</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px;">
+            <button class="btn" onclick="createListener(false)" style="padding:8px 18px;font-size:13px;">🚀 Create & Start</button>
+            <button class="btn" onclick="createListener(true)" style="padding:8px 18px;font-size:13px;background:var(--green);">💾 Create, Start & Save Preset</button>
+            <button class="qbtn" onclick="savePresetOnly()" style="padding:8px 14px;font-size:12px;">💾 Save as Preset Only</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -740,9 +789,13 @@ async function refreshAll() {
   ).join('') || '<tr><td colspan="9" class="empty">No agents</td></tr>';
 
   // Listeners
-  document.getElementById('all-listeners').innerHTML = listeners.map(l =>
-    '<tr><td style="font-weight:600">'+l.name+'</td><td>'+l.type+'</td><td style="font-family:monospace">'+l.bind+'</td><td>'+badge(l.status)+'</td></tr>'
-  ).join('');
+  document.getElementById('all-listeners').innerHTML = listeners.map(l => {
+    const actions = l.status === 'running'
+      ? '<button class="qbtn" onclick="stopListener(\''+l.name+'\')" style="padding:4px 10px;font-size:11px;background:rgba(239,68,68,0.15);color:#ef4444;">⏹ Stop</button>'
+      : '<button class="qbtn" onclick="startListener(\''+l.name+'\')" style="padding:4px 10px;font-size:11px;background:rgba(16,185,129,0.15);color:#10b981;">▶ Start</button>';
+    return '<tr><td style="font-weight:600">'+l.name+'</td><td>'+l.type+'</td><td style="font-family:monospace">'+l.bind+'</td><td>'+badge(l.status)+'</td><td>'+actions+'</td></tr>';
+  }).join('');
+  loadPresets();
 
   // Dashboard tasks
   document.getElementById('dash-tasks').innerHTML = tasks.slice(0,8).map(t =>
@@ -1424,6 +1477,114 @@ document.getElementById('fb-agent').addEventListener('change', function() {
     loadNotes(this.value);
   }
 });
+
+// ──── Listener Management ────
+async function startListener(name) {
+  try {
+    const resp = await fetch('/api/listener/start?name='+encodeURIComponent(name));
+    const data = await resp.json();
+    if (data.error) { alert('Error: ' + data.error); return; }
+    refreshAll();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function stopListener(name) {
+  if (!confirm('Stop listener "'+name+'"?')) return;
+  try {
+    const resp = await fetch('/api/listener/stop?name='+encodeURIComponent(name));
+    const data = await resp.json();
+    if (data.error) { alert('Error: ' + data.error); return; }
+    refreshAll();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function createListener(savePreset) {
+  const name = document.getElementById('ln-name').value.trim();
+  const typ = document.getElementById('ln-type').value;
+  const bind = document.getElementById('ln-bind').value.trim();
+  const profile = document.getElementById('ln-profile').value;
+  if (!name || !bind) { alert('Name and bind address are required'); return; }
+
+  try {
+    const resp = await fetch('/api/listener/create', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name:name, type:typ, bind:bind, profile:profile, save:savePreset})
+    });
+    const data = await resp.json();
+    if (data.error) { alert('Error: ' + data.error); return; }
+    document.getElementById('ln-name').value = '';
+    document.getElementById('ln-bind').value = '';
+    refreshAll();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function savePresetOnly() {
+  const name = document.getElementById('ln-name').value.trim();
+  const typ = document.getElementById('ln-type').value;
+  const bind = document.getElementById('ln-bind').value.trim();
+  const profile = document.getElementById('ln-profile').value;
+  if (!name || !bind) { alert('Name and bind address are required'); return; }
+
+  try {
+    const resp = await fetch('/api/presets', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({action:'save', name:name, type:typ, bind:bind, profile:profile})
+    });
+    const data = await resp.json();
+    if (data.error) { alert('Error: ' + data.error); return; }
+    document.getElementById('ln-name').value = '';
+    document.getElementById('ln-bind').value = '';
+    loadPresets();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function loadPresets() {
+  const container = document.getElementById('presets-list');
+  if (!container) return;
+  try {
+    const presets = await fetchJ('/api/presets');
+    if (!presets || presets.length === 0) {
+      container.innerHTML = '<div style="color:var(--text-muted);font-size:13px;padding:12px;text-align:center;">No saved presets.<br><span style="font-size:11px;">Create a listener and save it as a preset for quick reuse.</span></div>';
+      return;
+    }
+    container.innerHTML = presets.map(p =>
+      '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;margin-bottom:6px;">' +
+      '<div>' +
+        '<div style="font-weight:600;font-size:13px;color:var(--text-primary);">'+p.name+'</div>' +
+        '<div style="font-size:11px;color:var(--text-muted);font-family:monospace;">'+p.type.toUpperCase()+' · '+p.bind+' · '+p.profile+'</div>' +
+      '</div>' +
+      '<div style="display:flex;gap:6px;">' +
+        '<button class="qbtn" onclick="usePreset(\''+p.name+'\')" style="padding:5px 12px;font-size:11px;background:rgba(124,58,237,0.15);color:var(--accent-light);">🚀 Launch</button>' +
+        '<button class="qbtn" onclick="deletePreset(\''+p.name+'\')" style="padding:5px 8px;font-size:11px;color:#ef4444;">✕</button>' +
+      '</div></div>'
+    ).join('');
+  } catch(e) { container.innerHTML = '<div style="color:var(--red);">'+e.message+'</div>'; }
+}
+
+async function usePreset(name) {
+  try {
+    const resp = await fetch('/api/presets', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({action:'use', name:name})
+    });
+    const data = await resp.json();
+    if (data.error) { alert('Error: ' + data.error); return; }
+    refreshAll();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function deletePreset(name) {
+  if (!confirm('Delete preset "'+name+'"?')) return;
+  try {
+    const resp = await fetch('/api/presets', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({action:'delete', name:name})
+    });
+    const data = await resp.json();
+    if (data.error) { alert('Error: ' + data.error); return; }
+    loadPresets();
+  } catch(e) { alert('Error: ' + e.message); }
+}
 
 // ──── Payload Generator ────
 function onPayloadTypeChange() {

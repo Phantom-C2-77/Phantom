@@ -52,6 +52,12 @@ func (w *WebUI) Start() error {
 	mux.HandleFunc("/api/payload/apps", w.auth.AuthMiddleware(w.handlePayloadAppTemplates))
 	mux.HandleFunc("/api/payload/download", w.auth.AuthMiddleware(w.handlePayloadDownload))
 
+	// Listener management API (auth required)
+	mux.HandleFunc("/api/listener/create", w.auth.AuthMiddleware(w.handleListenerCreate))
+	mux.HandleFunc("/api/listener/start", w.auth.AuthMiddleware(w.handleListenerAction))
+	mux.HandleFunc("/api/listener/stop", w.auth.AuthMiddleware(w.handleListenerAction))
+	mux.HandleFunc("/api/presets", w.auth.AuthMiddleware(w.handlePresets))
+
 	// New features (auth required)
 	mux.HandleFunc("/api/notes", w.auth.AuthMiddleware(w.handleAgentNotes))
 	mux.HandleFunc("/api/search", w.auth.AuthMiddleware(w.handleSearchOutput))

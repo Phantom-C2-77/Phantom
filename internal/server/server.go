@@ -124,6 +124,46 @@ func (s *Server) StopListener(name string) error {
 	return err
 }
 
+// CreateListener creates and registers a new listener at runtime.
+func (s *Server) CreateListener(name, typ, bind, profile, tlsCert, tlsKey string) error {
+	profilePath := filepath.Join("configs", "profiles", profile+".yaml")
+	prof, err := listener.LoadProfile(profilePath)
+	if err != nil {
+		prof = listener.DefaultProfile()
+	}
+
+	l := listener.NewHTTPListener(listener.ListenerConfig{
+		ID:       uuid.New().String(),
+		Name:     name,
+		Type:     typ,
+		BindAddr: bind,
+		Profile:  prof,
+		TLSCert:  tlsCert,
+		TLSKey:   tlsKey,
+		PrivKey:  s.PrivKey,
+		AgentMgr: s.AgentMgr,
+		TaskDisp: s.TaskDisp,
+		OnEvent:  s.handleEvent,
+		Database: s.DB,
+	})
+
+	if err := s.ListenerMgr.Add(l); err != nil {
+		return err
+	}
+
+	s.DB.InsertListener(&db.ListenerRecord{
+		ID:        l.ID,
+		Name:      l.Name,
+		Type:      l.Type,
+		BindAddr:  l.BindAddr,
+		ProfileID: profile,
+		TLSCert:   tlsCert,
+		TLSKey:    tlsKey,
+		Status:    "stopped",
+	})
+	return nil
+}
+
 // Shutdown gracefully shuts down the server.
 func (s *Server) Shutdown() {
 	s.ListenerMgr.StopAll()
