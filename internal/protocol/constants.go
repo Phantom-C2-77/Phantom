@@ -28,6 +28,8 @@ const (
 	TaskBOF         uint8 = 12  // Beacon Object File execution
 	TaskShellcode   uint8 = 13  // In-memory shellcode execution
 	TaskInject      uint8 = 14  // Remote process injection
+	TaskHollow      uint8 = 15  // Process hollowing
+	TaskEvasion     uint8 = 16  // Run/re-run evasion techniques
 )
 
 // Task status
@@ -76,6 +78,10 @@ func TaskTypeName(t uint8) string {
 		return "shellcode"
 	case TaskInject:
 		return "inject"
+	case TaskHollow:
+		return "hollow"
+	case TaskEvasion:
+		return "evasion"
 	default:
 		return "unknown"
 	}
