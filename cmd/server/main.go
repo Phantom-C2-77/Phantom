@@ -50,9 +50,8 @@ func main() {
 		fmt.Printf("  %s─────────────────────────────────────────────%s\n", cli.ColorDim, cli.ColorReset)
 		fmt.Println()
 
-		var username string
 		fmt.Printf("  %sUsername:%s ", cli.ColorCyan, cli.ColorReset)
-		fmt.Scanln(&username)
+		username := cli.ReadLine()
 		password := cli.ReadPassword(fmt.Sprintf("  %sPassword:%s ", cli.ColorCyan, cli.ColorReset))
 		confirm := cli.ReadPassword(fmt.Sprintf("  %sConfirm:%s  ", cli.ColorCyan, cli.ColorReset))
 
@@ -85,9 +84,8 @@ func main() {
 		fmt.Printf("  %s%sOperator Login%s\n", cli.ColorBold, cli.ColorPurple, cli.ColorReset)
 		fmt.Printf("  %s─────────────────────%s\n", cli.ColorDim, cli.ColorReset)
 
-		var username string
 		fmt.Printf("  %sUsername:%s ", cli.ColorCyan, cli.ColorReset)
-		fmt.Scanln(&username)
+		username := cli.ReadLine()
 		password := cli.ReadPassword(fmt.Sprintf("  %sPassword:%s ", cli.ColorCyan, cli.ColorReset))
 
 		_, err := auth.Authenticate(username, password)
@@ -99,9 +97,8 @@ func main() {
 		fmt.Println()
 	}
 
-	// Fix terminal after password prompts — reopen stdin from /dev/tty
-	// This is required because term.ReadPassword corrupts stdin on WSL
-	cli.ReopenStdin()
+	// Small delay to let terminal settle after password prompts
+	time.Sleep(100 * time.Millisecond)
 
 	// Load configuration
 	cli.Info("Loading configuration from %s", *configPath)
@@ -222,11 +219,16 @@ func promptMode() string {
 	fmt.Println()
 	fmt.Printf("  %sChoice [1/2/3]:%s ", cli.ColorPurple, cli.ColorReset)
 
-	// Use bufio.Scanner for reliable input after password masking
-	scanner := bufio.NewScanner(os.Stdin)
+	// Read from /dev/tty for reliable input
 	var choice string
-	if scanner.Scan() {
-		choice = strings.TrimSpace(scanner.Text())
+	tty, err := os.Open("/dev/tty")
+	if err == nil {
+		reader := bufio.NewReader(tty)
+		line, _ := reader.ReadString('\n')
+		choice = strings.TrimSpace(line)
+		tty.Close()
+	} else {
+		fmt.Scanln(&choice)
 	}
 
 	switch choice {

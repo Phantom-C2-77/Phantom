@@ -87,47 +87,11 @@ func (sh *Shell) Run() {
 	// Start session recording
 	sh.startSessionLog()
 
-	// Try to initialize liner (readline with tab completion + history)
-	linerOK := false
-	sh.liner = liner.NewLiner()
-	sh.liner.SetCtrlCAborts(false)
-	sh.liner.SetCompleter(sh.completer)
-	sh.liner.SetTabCompletionStyle(liner.TabPrints)
-	sh.loadHistory()
-
-	// Test if liner works by doing a quick check
-	linerOK = true
-
 	defer sh.cleanup()
 
-	if linerOK {
-		// Primary mode: liner (readline with tab completion, arrow keys, history)
-		for sh.running {
-			prompt := sh.getPrompt()
-
-			line, err := sh.liner.Prompt(prompt)
-			if err != nil {
-				if err.Error() == "prompt aborted" {
-					continue
-				}
-				// Liner failed — fall back to basic mode
-				Warn("Readline failed, switching to basic input mode")
-				sh.runBasicMode()
-				return
-			}
-
-			line = strings.TrimSpace(line)
-			if line == "" {
-				continue
-			}
-
-			sh.liner.AppendHistory(line)
-			sh.logCommand(line)
-			sh.execute(line)
-		}
-	} else {
-		sh.runBasicMode()
-	}
+	// Use basic mode directly — most reliable across all terminals
+	// Liner/readline has issues with terminal state after password prompts on WSL
+	sh.runBasicMode()
 }
 
 // runBasicMode is the fallback shell using bufio.Scanner when liner fails.

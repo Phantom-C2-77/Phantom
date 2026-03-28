@@ -6,7 +6,6 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/peterh/liner v1.2.2
 	github.com/vmihailenco/msgpack/v5 v5.4.1
-	golang.org/x/term v0.41.0
 	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
 	modernc.org/sqlite v1.48.0
 )
