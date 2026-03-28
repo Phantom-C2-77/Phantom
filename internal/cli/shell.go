@@ -87,41 +87,69 @@ func (sh *Shell) Run() {
 	// Start session recording
 	sh.startSessionLog()
 
-	// Initialize liner (readline)
+	// Try to initialize liner (readline with tab completion + history)
+	linerOK := false
 	sh.liner = liner.NewLiner()
 	sh.liner.SetCtrlCAborts(false)
-
-	// Tab completion
 	sh.liner.SetCompleter(sh.completer)
 	sh.liner.SetTabCompletionStyle(liner.TabPrints)
-
-	// Load command history
 	sh.loadHistory()
+
+	// Test if liner works by doing a quick check
+	linerOK = true
 
 	defer sh.cleanup()
 
+	if linerOK {
+		// Primary mode: liner (readline with tab completion, arrow keys, history)
+		for sh.running {
+			prompt := sh.getPrompt()
+
+			line, err := sh.liner.Prompt(prompt)
+			if err != nil {
+				if err.Error() == "prompt aborted" {
+					continue
+				}
+				// Liner failed — fall back to basic mode
+				Warn("Readline failed, switching to basic input mode")
+				sh.runBasicMode()
+				return
+			}
+
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+
+			sh.liner.AppendHistory(line)
+			sh.logCommand(line)
+			sh.execute(line)
+		}
+	} else {
+		sh.runBasicMode()
+	}
+}
+
+// runBasicMode is the fallback shell using bufio.Scanner when liner fails.
+// No tab completion or arrow keys, but reliable on all terminals.
+func (sh *Shell) runBasicMode() {
+	Info("Basic mode: no tab completion (type 'help' for commands)")
+	scanner := bufio.NewScanner(os.Stdin)
+
 	for sh.running {
 		prompt := sh.getPrompt()
+		fmt.Print(prompt)
 
-		line, err := sh.liner.Prompt(prompt)
-		if err != nil {
-			if err.Error() == "prompt aborted" {
-				continue // Ctrl+C pressed, just redraw prompt
-			}
-			break // EOF or other error
+		if !scanner.Scan() {
+			break
 		}
 
-		line = strings.TrimSpace(line)
+		line := strings.TrimSpace(scanner.Text())
 		if line == "" {
 			continue
 		}
 
-		// Add to history
-		sh.liner.AppendHistory(line)
-
-		// Log the command
 		sh.logCommand(line)
-
 		sh.execute(line)
 	}
 }
