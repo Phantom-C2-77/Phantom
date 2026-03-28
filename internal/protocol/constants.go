@@ -24,6 +24,8 @@ const (
 	TaskSleep       uint8 = 8
 	TaskKill        uint8 = 9
 	TaskCd          uint8 = 10
+	TaskAD          uint8 = 11  // Active Directory commands
+	TaskBOF         uint8 = 12  // Beacon Object File execution
 )
 
 // Task status
@@ -64,6 +66,10 @@ func TaskTypeName(t uint8) string {
 		return "kill"
 	case TaskCd:
 		return "cd"
+	case TaskAD:
+		return "ad"
+	case TaskBOF:
+		return "bof"
 	default:
 		return "unknown"
 	}

