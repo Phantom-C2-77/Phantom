@@ -35,3 +35,4 @@ vendor/
 loot/
 *.log
 configs/server.key
+configs/.phantom_creds
