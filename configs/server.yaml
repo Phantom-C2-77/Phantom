@@ -1,0 +1,35 @@
+# Phantom C2 Server Configuration
+
+server:
+  # Bind address for the TUI management interface
+  bind: "0.0.0.0"
+
+  # Database path (SQLite)
+  database: "data/phantom.db"
+
+  # RSA key paths (generated via 'make keygen')
+  rsa_private_key: "configs/server.key"
+  rsa_public_key: "configs/server.pub"
+
+  # Default agent settings
+  default_sleep: 10
+  default_jitter: 20
+
+# Default listener configuration
+listeners:
+  - name: "default-https"
+    type: "https"
+    bind: "0.0.0.0:443"
+    profile: "default"
+    tls_cert: "configs/server.crt"
+    tls_key: "configs/server-tls.key"
+
+  - name: "fallback-http"
+    type: "http"
+    bind: "0.0.0.0:8080"
+    profile: "default"
+
+# Logging
+logging:
+  level: "info"    # debug, info, warn, error
+  file: ""         # empty = stdout only

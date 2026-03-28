@@ -1,0 +1,37 @@
+# Cloudflare Workers Themed Communication Profile
+
+profile:
+  name: "cloudflare"
+
+  register_uri: "/cdn-cgi/trace"
+  checkin_uri: "/cdn-cgi/rum"
+
+  decoy_uris:
+    - "/cdn-cgi/challenge-platform/h/g"
+    - "/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"
+
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+
+  headers:
+    Server: "cloudflare"
+    CF-RAY: "{{uuid}}-IAD"
+    CF-Cache-Status: "DYNAMIC"
+    X-Content-Type-Options: "nosniff"
+    Alt-Svc: 'h3=":443"; ma=86400'
+
+  content_type: "application/json"
+
+  decoy_response: |
+    fl=731f22
+    h=cloudflare.com
+    ip=203.0.113.1
+    ts=1711500000
+    visit_scheme=https
+    uag=Mozilla/5.0
+    colo=IAD
+    sliver=none
+    http=http/2
+    loc=US
+    tls=TLSv1.3
+    sni=plaintext
+    warp=off

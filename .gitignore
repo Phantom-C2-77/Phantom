@@ -1,0 +1,36 @@
+# Binaries
+build/
+*.exe
+*.out
+*.bin
+phantom-server
+phantom-agent
+
+# Database
+data/*.db
+
+# Keys and certs
+configs/*.pem
+configs/*.key
+configs/*.crt
+*.pem
+*.key
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Go
+vendor/
+*.test
+
+# Loot and logs
+loot/
+*.log

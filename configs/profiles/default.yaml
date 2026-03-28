@@ -1,0 +1,30 @@
+# Default Communication Profile
+
+profile:
+  name: "default"
+
+  # URIs for agent communication
+  register_uri: "/api/v1/auth"
+  checkin_uri: "/api/v1/status"
+
+  # Decoy URIs (serve fake content to non-agents)
+  decoy_uris:
+    - "/api/v1/health"
+    - "/api/v1/version"
+
+  # Expected User-Agent (requests not matching get decoy response)
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+
+  # Response headers to blend in
+  headers:
+    Server: "nginx/1.24.0"
+    X-Content-Type-Options: "nosniff"
+    X-Request-ID: "{{uuid}}"
+    Cache-Control: "no-cache, no-store"
+
+  # Content type for C2 traffic
+  content_type: "application/json"
+
+  # Decoy response for non-agent requests
+  decoy_response: |
+    {"status":"ok","version":"2.1.0","uptime":99.98}

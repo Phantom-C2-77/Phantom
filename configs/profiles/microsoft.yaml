@@ -1,0 +1,25 @@
+# Microsoft Azure/O365 Themed Communication Profile
+
+profile:
+  name: "microsoft"
+
+  register_uri: "/common/oauth2/v2.0/token"
+  checkin_uri: "/v1.0/me/drive/root/children"
+
+  decoy_uris:
+    - "/common/discovery/instance"
+    - "/v1.0/me/messages"
+
+  user_agent: "Microsoft Office/16.0 (Windows NT 10.0; Microsoft Outlook 16.0)"
+
+  headers:
+    Server: "Microsoft-IIS/10.0"
+    X-Powered-By: "ASP.NET"
+    X-MS-Request-Id: "{{uuid}}"
+    X-Content-Type-Options: "nosniff"
+    Strict-Transport-Security: "max-age=31536000"
+
+  content_type: "application/json; charset=utf-8"
+
+  decoy_response: |
+    {"error":{"code":"InvalidAuthenticationToken","message":"Access token is empty."}}
