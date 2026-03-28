@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/peterh/liner"
 	"github.com/phantom-c2/phantom/internal/agent"
 	"github.com/phantom-c2/phantom/internal/db"
 	"github.com/phantom-c2/phantom/internal/payloads"
@@ -18,12 +20,38 @@ import (
 	"github.com/phantom-c2/phantom/internal/util"
 )
 
+const historyFile = ".phantom_history"
+
+// Global commands available at the main prompt.
+var globalCommands = []string{
+	"agents", "interact", "listeners", "tasks", "generate",
+	"remove", "loot", "events", "clear", "help", "exit",
+	"build", "payload",
+}
+
+// Agent commands available when interacting with an agent.
+var agentCommands = []string{
+	"shell", "exec", "cmd", "upload", "download", "screenshot",
+	"ps", "sysinfo", "persist", "sleep", "cd", "kill",
+	"bof", "shellcode", "inject", "hollow", "evasion", "pivot",
+	"info", "tasks", "back", "help",
+	"ad-help", "ad-enum-domain", "ad-enum-users", "ad-enum-groups",
+	"ad-enum-computers", "ad-enum-shares", "ad-enum-spns",
+	"ad-enum-gpo", "ad-enum-trusts", "ad-enum-admins",
+	"ad-enum-asrep", "ad-enum-delegation", "ad-enum-laps",
+	"ad-kerberoast", "ad-asreproast", "ad-dcsync",
+	"ad-dump-sam", "ad-dump-lsa", "ad-dump-tickets",
+	"ad-psexec", "ad-wmi", "ad-winrm", "ad-pass-the-hash",
+}
+
 // Shell is the interactive CLI shell for Phantom.
 type Shell struct {
 	server      *server.Server
 	scanner     *bufio.Scanner
+	liner       *liner.State
 	activeAgent *db.Agent // currently interacting agent
 	running     bool
+	sessionLog  *os.File  // session recording
 }
 
 // NewShell creates a new CLI shell.
@@ -35,7 +63,7 @@ func NewShell(srv *server.Server) *Shell {
 	}
 }
 
-// Run starts the interactive shell loop.
+// Run starts the interactive shell loop with readline support.
 func (sh *Shell) Run() {
 	// Handle Ctrl+C gracefully
 	sigChan := make(chan os.Signal, 1)
@@ -44,6 +72,7 @@ func (sh *Shell) Run() {
 		<-sigChan
 		fmt.Println()
 		Info("Shutting down...")
+		sh.cleanup()
 		sh.server.Shutdown()
 		os.Exit(0)
 	}()
@@ -51,28 +80,243 @@ func (sh *Shell) Run() {
 	// Register event handler for live notifications
 	sh.server.OnEvent = sh.onEvent
 
-	for sh.running {
-		sh.printPrompt()
+	// Start session recording
+	sh.startSessionLog()
 
-		if !sh.scanner.Scan() {
-			break
+	// Initialize liner (readline)
+	sh.liner = liner.NewLiner()
+	sh.liner.SetCtrlCAborts(false)
+
+	// Tab completion
+	sh.liner.SetCompleter(sh.completer)
+	sh.liner.SetTabCompletionStyle(liner.TabPrints)
+
+	// Load command history
+	sh.loadHistory()
+
+	defer sh.cleanup()
+
+	for sh.running {
+		prompt := sh.getPrompt()
+
+		line, err := sh.liner.Prompt(prompt)
+		if err != nil {
+			if err.Error() == "prompt aborted" {
+				continue // Ctrl+C pressed, just redraw prompt
+			}
+			break // EOF or other error
 		}
 
-		line := strings.TrimSpace(sh.scanner.Text())
+		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
+
+		// Add to history
+		sh.liner.AppendHistory(line)
+
+		// Log the command
+		sh.logCommand(line)
 
 		sh.execute(line)
 	}
 }
 
-// printPrompt displays the CLI prompt.
-func (sh *Shell) printPrompt() {
+// getPrompt returns the current prompt string.
+func (sh *Shell) getPrompt() string {
 	if sh.activeAgent != nil {
-		fmt.Printf("\n  %sphantom%s [%s%s%s] > ", colorPurple, colorReset, colorCyan, sh.activeAgent.Name, colorReset)
+		return fmt.Sprintf("\n  %sphantom%s [%s%s%s] > ", colorPurple, colorReset, colorCyan, sh.activeAgent.Name, colorReset)
+	}
+	return fmt.Sprintf("\n  %sphantom%s > ", colorPurple, colorReset)
+}
+
+// completer provides tab completion for commands and arguments.
+func (sh *Shell) completer(line string) []string {
+	var candidates []string
+
+	parts := strings.Fields(line)
+	prefix := line
+
+	if sh.activeAgent != nil {
+		// Agent mode completion
+		if len(parts) <= 1 {
+			// Complete the command itself
+			for _, cmd := range agentCommands {
+				if strings.HasPrefix(cmd, strings.ToLower(prefix)) {
+					candidates = append(candidates, cmd)
+				}
+			}
+		} else {
+			// Complete arguments
+			cmd := strings.ToLower(parts[0])
+			argPrefix := ""
+			if len(parts) > 1 {
+				argPrefix = parts[len(parts)-1]
+			}
+			if !strings.HasSuffix(line, " ") {
+				argPrefix = parts[len(parts)-1]
+			} else {
+				argPrefix = ""
+			}
+
+			switch cmd {
+			case "persist":
+				methods := []string{"registry", "schtask", "cron", "service", "bashrc"}
+				for _, m := range methods {
+					if strings.HasPrefix(m, argPrefix) {
+						candidates = append(candidates, strings.Join(parts[:len(parts)-1], " ")+" "+m)
+					}
+				}
+			case "pivot":
+				actions := []string{"start", "stop", "list"}
+				for _, a := range actions {
+					if strings.HasPrefix(a, argPrefix) {
+						candidates = append(candidates, "pivot "+a)
+					}
+				}
+			case "generate":
+				types := []string{"exe", "elf", "exe-garble", "elf-garble", "aspx", "php", "jsp", "powershell", "bash", "python", "hta", "vba"}
+				for _, t := range types {
+					if strings.HasPrefix(t, argPrefix) {
+						candidates = append(candidates, "generate "+t)
+					}
+				}
+			}
+		}
 	} else {
-		fmt.Printf("\n  %sphantom%s > ", colorPurple, colorReset)
+		// Global mode completion
+		if len(parts) <= 1 {
+			for _, cmd := range globalCommands {
+				if strings.HasPrefix(cmd, strings.ToLower(prefix)) {
+					candidates = append(candidates, cmd)
+				}
+			}
+		} else {
+			cmd := strings.ToLower(parts[0])
+			argPrefix := ""
+			if !strings.HasSuffix(line, " ") && len(parts) > 1 {
+				argPrefix = parts[len(parts)-1]
+			}
+
+			switch cmd {
+			case "interact", "use", "remove", "rm":
+				// Complete with agent names
+				agents, _ := sh.server.AgentMgr.List()
+				for _, a := range agents {
+					if strings.HasPrefix(a.Name, argPrefix) {
+						candidates = append(candidates, cmd+" "+a.Name)
+					}
+				}
+			case "listeners":
+				actions := []string{"start", "stop"}
+				for _, a := range actions {
+					if strings.HasPrefix(a, argPrefix) {
+						candidates = append(candidates, "listeners "+a)
+					}
+				}
+				// Also complete listener names for start/stop
+				if len(parts) >= 2 && (parts[1] == "start" || parts[1] == "stop") {
+					listeners := sh.server.ListenerMgr.List()
+					for _, l := range listeners {
+						if strings.HasPrefix(l.Name, argPrefix) {
+							candidates = append(candidates, "listeners "+parts[1]+" "+l.Name)
+						}
+					}
+				}
+			case "generate", "build", "payload":
+				types := []string{"exe", "elf", "exe-garble", "elf-garble", "aspx", "php", "jsp", "powershell", "bash", "python", "hta", "vba"}
+				for _, t := range types {
+					if strings.HasPrefix(t, argPrefix) {
+						candidates = append(candidates, "generate "+t)
+					}
+				}
+			}
+		}
+	}
+
+	return candidates
+}
+
+// printPrompt displays the CLI prompt (used by event callbacks).
+func (sh *Shell) printPrompt() {
+	// When using liner, we don't manually print prompts
+	// — liner handles prompt display. This is only for event notifications.
+}
+
+// ──────── History ────────
+
+func (sh *Shell) loadHistory() {
+	histPath := sh.historyPath()
+	f, err := os.Open(histPath)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	sh.liner.ReadHistory(f)
+}
+
+func (sh *Shell) saveHistory() {
+	histPath := sh.historyPath()
+	f, err := os.Create(histPath)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	sh.liner.WriteHistory(f)
+}
+
+func (sh *Shell) historyPath() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return historyFile
+	}
+	return filepath.Join(home, historyFile)
+}
+
+// ──────── Session Recording ────────
+
+func (sh *Shell) startSessionLog() {
+	os.MkdirAll("logs", 0755)
+	logName := fmt.Sprintf("logs/session_%s.log", time.Now().Format("2006-01-02_150405"))
+	f, err := os.Create(logName)
+	if err != nil {
+		return
+	}
+	sh.sessionLog = f
+	fmt.Fprintf(f, "# Phantom C2 Session Log\n")
+	fmt.Fprintf(f, "# Started: %s\n\n", time.Now().Format(time.RFC3339))
+	Info("Session recording: %s", logName)
+}
+
+func (sh *Shell) logCommand(line string) {
+	if sh.sessionLog == nil {
+		return
+	}
+	timestamp := time.Now().Format("15:04:05")
+	prompt := "phantom"
+	if sh.activeAgent != nil {
+		prompt = fmt.Sprintf("phantom [%s]", sh.activeAgent.Name)
+	}
+	fmt.Fprintf(sh.sessionLog, "[%s] %s > %s\n", timestamp, prompt, line)
+}
+
+func (sh *Shell) logOutput(output string) {
+	if sh.sessionLog == nil {
+		return
+	}
+	for _, line := range strings.Split(output, "\n") {
+		fmt.Fprintf(sh.sessionLog, "  %s\n", line)
+	}
+}
+
+func (sh *Shell) cleanup() {
+	if sh.liner != nil {
+		sh.saveHistory()
+		sh.liner.Close()
+	}
+	if sh.sessionLog != nil {
+		fmt.Fprintf(sh.sessionLog, "\n# Ended: %s\n", time.Now().Format(time.RFC3339))
+		sh.sessionLog.Close()
 	}
 }
 
@@ -504,15 +748,13 @@ func (sh *Shell) cmdRemoveAgent(args []string) {
 		return
 	}
 
-	Warn("Remove agent '%s' (%s@%s)? This cannot be undone. (y/N): ", a.Name, a.Username, a.Hostname)
-	if sh.scanner.Scan() {
-		if strings.ToLower(strings.TrimSpace(sh.scanner.Text())) == "y" {
-			if err := sh.server.AgentMgr.Remove(a.ID); err != nil {
-				Error("Failed to remove: %v", err)
-				return
-			}
-			Success("Agent '%s' removed", a.Name)
+	answer, err := sh.liner.Prompt(fmt.Sprintf("  [!] Remove agent '%s' (%s@%s)? (y/N): ", a.Name, a.Username, a.Hostname))
+	if err == nil && strings.ToLower(strings.TrimSpace(answer)) == "y" {
+		if err := sh.server.AgentMgr.Remove(a.ID); err != nil {
+			Error("Failed to remove: %v", err)
+			return
 		}
+		Success("Agent '%s' removed", a.Name)
 	}
 }
 
@@ -716,13 +958,11 @@ func (sh *Shell) cmdCd(args []string) {
 }
 
 func (sh *Shell) cmdKill() {
-	Warn("This will terminate the agent. Are you sure? (y/N): ")
-	if sh.scanner.Scan() {
-		if strings.ToLower(strings.TrimSpace(sh.scanner.Text())) == "y" {
-			sh.queueTask(protocol.TaskKill, nil, nil)
-			Warn("Kill task queued — agent will terminate on next check-in")
-			sh.activeAgent = nil
-		}
+	answer, err := sh.liner.Prompt("  [!] This will terminate the agent. Are you sure? (y/N): ")
+	if err == nil && strings.ToLower(strings.TrimSpace(answer)) == "y" {
+		sh.queueTask(protocol.TaskKill, nil, nil)
+		Warn("Kill task queued — agent will terminate on next check-in")
+		sh.activeAgent = nil
 	}
 }
 
@@ -958,12 +1198,14 @@ func (sh *Shell) onEvent(event string, args ...interface{}) {
 
 				if result.Error != "" {
 					fmt.Printf("  %s[-] Error: %s%s\n", colorRed, result.Error, colorReset)
+					sh.logOutput("Error: " + result.Error)
 				} else {
 					output := string(result.Output)
 					lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
 					for _, line := range lines {
 						fmt.Printf("  %s%s%s\n", colorWhite, line, colorReset)
 					}
+					sh.logOutput(output)
 				}
 			} else {
 				fmt.Printf("\r  %s[%s]%s Task result received (ID: %s)\n", colorCyan, timestamp, colorReset, util.ShortID(taskID))
