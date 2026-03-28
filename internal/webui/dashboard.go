@@ -582,13 +582,15 @@ tr.clickable { cursor: pointer; }
               <input type="text" id="fb-path" placeholder="/ or C:\\" style="flex:1;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;font-family:monospace;">
               <button class="btn" onclick="browseFiles()" style="padding:8px 14px;font-size:12px;">Browse</button>
             </div>
-            <div class="quick-actions" style="margin-bottom:10px;">
+            <div style="display:flex;gap:6px;margin-bottom:10px;">
+              <button class="qbtn" onclick="fbGoUp()" title="Go to parent directory">⬆ Up</button>
+              <button class="qbtn" onclick="browseFiles()" title="Refresh current directory">🔄 Refresh</button>
+            </div>
+            <div id="fb-quick-btns" class="quick-actions" style="margin-bottom:10px;">
               <button class="qbtn" onclick="browseDir('/')">/ (root)</button>
               <button class="qbtn" onclick="browseDir('/home')">home</button>
               <button class="qbtn" onclick="browseDir('/etc')">etc</button>
               <button class="qbtn" onclick="browseDir('/tmp')">tmp</button>
-              <button class="qbtn" onclick="browseDir('C:\\Users')">C:\Users</button>
-              <button class="qbtn" onclick="browseDir('C:\\Windows')">C:\Windows</button>
             </div>
             <div id="fb-output" style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:12px;min-height:200px;max-height:350px;overflow-y:auto;font-family:monospace;font-size:12px;color:var(--text-muted);white-space:pre-wrap;">
               Select an agent and path, then click Browse.
@@ -1154,17 +1156,68 @@ function getSelectedFBAgent() {
   return sel.value;
 }
 
+// Track current agent OS for file browser
+var fbCurrentOS = 'linux';
+var fbCurrentPath = '/';
+
+function getAgentOS(agentName) {
+  if (!window._cachedAgents) return 'linux';
+  const a = window._cachedAgents.find(x => x.name === agentName);
+  return a ? a.os : 'linux';
+}
+
+function updateFBQuickButtons() {
+  const btns = document.getElementById('fb-quick-btns');
+  if (!btns) return;
+  if (fbCurrentOS === 'windows') {
+    btns.innerHTML = '<button class="qbtn" onclick="browseDir(\'C:\\\\\')">C:\\ (root)</button>' +
+      '<button class="qbtn" onclick="browseDir(\'C:\\\\Users\')">C:\\Users</button>' +
+      '<button class="qbtn" onclick="browseDir(\'C:\\\\Windows\')">C:\\Windows</button>' +
+      '<button class="qbtn" onclick="browseDir(\'C:\\\\Program Files\')">Program Files</button>' +
+      '<button class="qbtn" onclick="browseDir(\'C:\\\\Temp\')">C:\\Temp</button>';
+    document.getElementById('fb-path').placeholder = 'C:\\';
+  } else {
+    btns.innerHTML = '<button class="qbtn" onclick="browseDir(\'/\')">/ (root)</button>' +
+      '<button class="qbtn" onclick="browseDir(\'/home\')">home</button>' +
+      '<button class="qbtn" onclick="browseDir(\'/etc\')">etc</button>' +
+      '<button class="qbtn" onclick="browseDir(\'/tmp\')">tmp</button>' +
+      '<button class="qbtn" onclick="browseDir(\'/var\')">var</button>' +
+      '<button class="qbtn" onclick="browseDir(\'/root\')">root</button>';
+    document.getElementById('fb-path').placeholder = '/';
+  }
+}
+
+function fbGoUp() {
+  const pathInput = document.getElementById('fb-path');
+  let p = pathInput.value.trim();
+  if (!p) p = fbCurrentPath;
+  if (fbCurrentOS === 'windows') {
+    p = p.replace(/\\+$/, '');
+    const idx = p.lastIndexOf('\\');
+    pathInput.value = idx > 0 ? p.substring(0, idx) : p.substring(0, 3);
+  } else {
+    p = p.replace(/\/+$/, '');
+    const idx = p.lastIndexOf('/');
+    pathInput.value = idx > 0 ? p.substring(0, idx) : '/';
+  }
+  browseFiles();
+}
+
 async function browseFiles() {
   const agent = getSelectedFBAgent(); if (!agent) return;
-  const path = document.getElementById('fb-path').value || '/';
+  fbCurrentOS = getAgentOS(agent);
+  const defaultPath = fbCurrentOS === 'windows' ? 'C:\\' : '/';
+  const path = document.getElementById('fb-path').value || defaultPath;
+  fbCurrentPath = path;
   const output = document.getElementById('fb-output');
   output.textContent = 'Requesting directory listing...';
+  const cmdLabel = fbCurrentOS === 'windows' ? 'dir ' + path : '$ ls -la ' + path;
 
   try {
     const resp = await fetch('/api/filebrowser?agent='+encodeURIComponent(agent)+'&path='+encodeURIComponent(path));
     const data = await resp.json();
     if (data.error) { output.textContent = 'Error: ' + data.error; return; }
-    output.innerHTML = '<span style="color:var(--green)">Task queued (ID: '+data.task_id.substring(0,8)+')</span>\n\nWaiting for agent check-in...\nResults will appear in the agent detail / terminal.';
+    output.innerHTML = '<span style="color:var(--green)">Task queued (ID: '+data.task_id.substring(0,8)+')</span>\n\nWaiting for agent check-in...\nResults will appear below.';
 
     // Poll for result
     for (let i = 0; i < 20; i++) {
@@ -1173,7 +1226,7 @@ async function browseFiles() {
       if (detail.tasks && detail.tasks.length > 0) {
         const task = detail.tasks.find(t => data.task_id.startsWith(t.id) || t.id.startsWith(data.task_id.substring(0,8)));
         if (task && task.output && task.status !== 'pending' && task.status !== 'sent') {
-          output.innerHTML = '<span style="color:var(--green)">$ ls -la ' + path + '</span>\n\n' + task.output;
+          output.innerHTML = '<span style="color:var(--green)">' + cmdLabel + '</span>\n\n' + task.output;
           return;
         }
       }
@@ -1283,6 +1336,7 @@ async function searchOutput() {
 
 // Update file browser agent selector on refresh
 function updateFBAgentSelector(agents) {
+  window._cachedAgents = agents;
   const sel = document.getElementById('fb-agent');
   if (!sel) return;
   const cur = sel.value;
@@ -1290,12 +1344,20 @@ function updateFBAgentSelector(agents) {
     '<option value="'+a.name+'" '+(a.name===cur?'selected':'')+'>'+a.name+' ('+a.os+' / '+a.hostname+')</option>'
   ).join('');
 
-  // Load notes if agent selected
-  if (sel.value) loadNotes(sel.value);
+  // Update OS-specific buttons if agent selected
+  if (sel.value) {
+    fbCurrentOS = getAgentOS(sel.value);
+    updateFBQuickButtons();
+    loadNotes(sel.value);
+  }
 }
 
 document.getElementById('fb-agent').addEventListener('change', function() {
-  if (this.value) loadNotes(this.value);
+  if (this.value) {
+    fbCurrentOS = getAgentOS(this.value);
+    updateFBQuickButtons();
+    loadNotes(this.value);
+  }
 });
 
 // ──── Payload Generator ────
