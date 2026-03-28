@@ -14,6 +14,7 @@ import (
 
 	"github.com/peterh/liner"
 	"github.com/phantom-c2/phantom/internal/agent"
+	"github.com/phantom-c2/phantom/internal/listener"
 	"github.com/phantom-c2/phantom/internal/webui"
 	"github.com/phantom-c2/phantom/internal/db"
 	"github.com/phantom-c2/phantom/internal/payloads"
@@ -371,6 +372,8 @@ func (sh *Shell) execute(line string) {
 		sh.cmdWebUI(args)
 	case "webhook":
 		sh.cmdWebhook(args)
+	case "redirector":
+		sh.cmdRedirector(args)
 	case "clear", "cls":
 		fmt.Print("\033[H\033[2J")
 	case "exit", "quit":
@@ -466,6 +469,7 @@ func (sh *Shell) cmdHelp() {
 		{"report [md|csv|all]", "Generate engagement report"},
 		{"webui [addr]", "Start web dashboard (default: 127.0.0.1:3000)"},
 		{"webhook <slack|discord> <url>", "Set webhook notifications"},
+		{"redirector <domain> <c2_ip>", "Generate redirector configs"},
 		{"doctor", "Run diagnostics / troubleshooting"},
 		{"version", "Show version info"},
 		{"events", "View event log"},
@@ -917,6 +921,56 @@ func (sh *Shell) cmdWebUI(args []string) {
 
 	Success("Web UI started: http://%s", addr)
 	Info("Open in your browser to view the dashboard")
+}
+
+func (sh *Shell) cmdRedirector(args []string) {
+	if len(args) < 2 {
+		fmt.Println()
+		fmt.Printf("  %s%sRedirector Configuration Generator%s\n", colorBold, colorPurple, colorReset)
+		fmt.Printf("  %s──────────────────────────────────────────────────%s\n", colorDim, colorReset)
+		fmt.Println()
+		fmt.Printf("  %sUsage:%s redirector <domain> <c2_ip> [c2_port] [redir_port]\n", colorCyan, colorReset)
+		fmt.Println()
+		fmt.Printf("  %sExample:%s\n", colorYellow, colorReset)
+		fmt.Printf("    redirector updates.example.com 10.0.0.5\n")
+		fmt.Printf("    redirector cdn.company.com 10.0.0.5 8080 443\n")
+		fmt.Println()
+		fmt.Printf("  %sGenerates configs for:%s\n", colorYellow, colorReset)
+		fmt.Printf("    • Nginx reverse proxy (with Let's Encrypt)\n")
+		fmt.Printf("    • Apache mod_rewrite\n")
+		fmt.Printf("    • Cloudflare Worker (domain fronting)\n")
+		fmt.Printf("    • Caddy (auto-TLS)\n")
+		fmt.Printf("    • socat (quick testing)\n")
+		fmt.Printf("    • iptables (transparent)\n")
+		fmt.Printf("    • Setup guide with OPSEC checklist\n")
+		fmt.Println()
+		return
+	}
+
+	cfg := listener.RedirectorConfig{
+		RedirDomain: args[0],
+		C2Host:      args[1],
+		C2Port:      "8080",
+		RedirPort:   "443",
+	}
+	if len(args) > 2 {
+		cfg.C2Port = args[2]
+	}
+	if len(args) > 3 {
+		cfg.RedirPort = args[3]
+	}
+
+	output, err := listener.GenerateRedirectorConfigs(cfg, "build/redirector")
+	if err != nil {
+		Error("Failed: %v", err)
+		return
+	}
+
+	Success("Redirector configs generated for %s → %s:%s", cfg.RedirDomain, cfg.C2Host, cfg.C2Port)
+	fmt.Println(output)
+	fmt.Println()
+	Info("Deploy the config on your redirector VPS")
+	Info("Then build agents with: generate exe https://%s:%s", cfg.RedirDomain, cfg.RedirPort)
 }
 
 func (sh *Shell) cmdWebhook(args []string) {
