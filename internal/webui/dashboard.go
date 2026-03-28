@@ -543,8 +543,12 @@ tr.clickable { cursor: pointer; }
               </div>
 
               <div style="margin-bottom:12px;">
-                <label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Listener URL (Callback)</label>
-                <input type="text" id="pl-url" value="https://127.0.0.1:443" placeholder="https://your-c2:443" style="width:100%;padding:10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;">
+                <label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Listener (Callback)</label>
+                <select id="pl-listener-select" onchange="onListenerSelect()" style="width:100%;padding:10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;margin-bottom:6px;">
+                  <option value="">-- Select a listener or preset --</option>
+                </select>
+                <input type="text" id="pl-url" placeholder="https://your-c2:443" style="width:100%;padding:10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;font-family:monospace;">
+                <div style="font-size:10px;color:var(--text-muted);margin-top:3px;">Select from above or type a custom URL</div>
               </div>
 
               <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px;">
@@ -743,6 +747,7 @@ async function fetchJ(u) { try { return await (await fetch(u)).json(); } catch(e
 async function refreshAll() {
   const agents = await fetchJ('/api/agents');
   const listeners = await fetchJ('/api/listeners');
+  window._cachedListeners = listeners;
   const tasks = await fetchJ('/api/tasks');
   const events = await fetchJ('/api/events') || [];
 
@@ -1543,6 +1548,8 @@ async function loadPresets() {
   if (!container) return;
   try {
     const presets = await fetchJ('/api/presets');
+    window._cachedPresets = presets;
+    populateListenerSelector();
     if (!presets || presets.length === 0) {
       container.innerHTML = '<div style="color:var(--text-muted);font-size:13px;padding:12px;text-align:center;">No saved presets.<br><span style="font-size:11px;">Create a listener and save it as a preset for quick reuse.</span></div>';
       return;
@@ -1587,6 +1594,47 @@ async function deletePreset(name) {
 }
 
 // ──── Payload Generator ────
+function populateListenerSelector() {
+  const sel = document.getElementById('pl-listener-select');
+  if (!sel) return;
+  const cur = sel.value;
+  let opts = '<option value="">-- Select a listener or preset --</option>';
+
+  // Add running listeners
+  if (window._cachedListeners && window._cachedListeners.length > 0) {
+    opts += '<optgroup label="Active Listeners">';
+    window._cachedListeners.forEach(l => {
+      if (l.status === 'running') {
+        const proto = l.type === 'HTTPS' ? 'https' : 'http';
+        const url = proto + '://' + l.bind;
+        opts += '<option value="'+url+'">'+l.name+' ('+url+')</option>';
+      }
+    });
+    opts += '</optgroup>';
+  }
+
+  // Add presets
+  if (window._cachedPresets && window._cachedPresets.length > 0) {
+    opts += '<optgroup label="Saved Presets">';
+    window._cachedPresets.forEach(p => {
+      const proto = p.type === 'https' ? 'https' : 'http';
+      const url = proto + '://' + p.bind;
+      opts += '<option value="'+url+'">💾 '+p.name+' ('+url+')</option>';
+    });
+    opts += '</optgroup>';
+  }
+
+  sel.innerHTML = opts;
+  if (cur) sel.value = cur;
+}
+
+function onListenerSelect() {
+  const sel = document.getElementById('pl-listener-select');
+  if (sel.value) {
+    document.getElementById('pl-url').value = sel.value;
+  }
+}
+
 function onPayloadTypeChange() {
   const type = document.getElementById('pl-type').value;
   const appRow = document.getElementById('pl-app-row');
