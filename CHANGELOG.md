@@ -2,6 +2,48 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.1] — 2026-03-28
+
+### 🎨 Web UI Redesign + Stability Fixes
+
+**Web UI — Complete Redesign**
+- Mythic/Cobalt Strike-inspired dark theme with purple accent glow
+- Beacon Activity line chart (real-time agent tracking over time)
+- OS Distribution donut chart (Windows/Linux/Android/iOS)
+- Session Health progress bars (Active/Dormant/Dead ratios)
+- Network Topology graph (C2 server → agent connections with status colors)
+- Agent cards with hover effects (click to interact)
+- Interactive terminal with quick-action buttons
+- Icon sidebar with agent badge counts
+- Google Inter + JetBrains Mono fonts
+- Auto-refresh every 4 seconds
+
+**Authentication**
+- Operator login with masked password input (stty -echo)
+- First-run credential setup
+- Password hashed with SHA-256 + salt
+- All input reads from /dev/tty (fixes WSL terminal corruption)
+
+**Stability Fixes**
+- Fixed CLI not starting after password prompt on WSL
+- Fixed "Both" mode (CLI + Web UI) startup timing
+- All terminal input uses /dev/tty for reliability
+- Basic mode fallback when readline fails
+
+**Mobile**
+- 30+ fake app templates with C2 callback
+- Mobile evasion suite (anti-emulator, anti-Frida, anti-AV, anti-debug)
+- /api/v1/mobile/checkin endpoint for Android/iOS agents
+- Credential capture endpoint (/api/v1/creds)
+
+**Diagnostics**
+- Built-in troubleshooting: --doctor flag or 'doctor' command
+- Checks 25+ items: config, keys, ports, network, tools, directories
+- TROUBLESHOOTING.md with 10 common issues and fixes
+- Versioning system: VERSION file, CHANGELOG.md, --version flag, git tags
+
+---
+
 ## [1.0.0] — 2026-03-28
 
 ### 🎉 Initial Release

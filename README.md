@@ -26,6 +26,12 @@
 
 ## Screenshots
 
+### Login & Mode Selection
+![Login](docs/assets/screenshot-login.png)
+
+### Web UI Dashboard (Cobalt Strike-style graphs)
+![Web UI](docs/assets/screenshot-webui-overview.png)
+
 ### Server Startup
 ![Startup](docs/assets/screenshot-startup.png)
 
@@ -63,19 +69,54 @@
 
 ## Features
 
-- **CLI-first interface** — readline with tab completion, command history, arrow keys, styled output
-- **Web UI dashboard** — browser-based real-time view alongside CLI (http://localhost:3000)
-- **Cross-platform** — server and agents run on Windows and Linux; Docker deployment supported
-- **Encrypted communications** — RSA-2048 key exchange + AES-256-GCM with auto key rotation
-- **Malleable profiles** — disguise C2 traffic as Microsoft 365, Cloudflare, or custom API traffic
-- **DNS C2 channel** — operate over DNS TXT records to bypass firewalls
-- **Evasion suite** — AMSI bypass, ETW bypass, ntdll unhooking, process hollowing, sandbox detection
-- **In-memory execution** — BOF loader (COFF parser on Windows, memfd on Linux), shellcode injection, process injection — zero disk footprint
-- **22 Active Directory commands** — enumeration, Kerberoasting, AS-REP roast, DCSync, lateral movement, credential dumping
-- **Post-exploitation** — token manipulation, keylogger, SOCKS5 proxy, port forwarding, credential harvesting
-- **8 payload types** — ASPX/PHP/JSP web shells, PowerShell/Bash/Python stagers, HTA and VBA macros
-- **SMB/Unix socket pivoting** — agent-to-agent relay for internal network access
-- **Agent builder** — cross-compile agents directly from the CLI with garble obfuscation and staging support
+**Interface**
+- **Dual interface** — choose CLI, Web UI, or both on startup
+- **Operator authentication** — first-run setup + masked password login
+- **Web UI dashboard** — Cobalt Strike/Mythic-inspired dark theme with beacon graphs, network topology, agent cards, interactive terminal
+- **CLI shell** — styled prompt with session recording and real-time event notifications
+
+**Communications**
+- **HTTP/HTTPS/DNS listeners** with malleable communication profiles
+- **Encrypted comms** — RSA-2048 key exchange + AES-256-GCM with auto key rotation
+- **3 malleable profiles** — Default, Microsoft 365, Cloudflare Workers
+- **SMB/Unix socket pivoting** — agent-to-agent relay for lateral access
+- **Mobile endpoint** — `/api/v1/mobile/checkin` for Android/iOS callbacks
+
+**Evasion & Stealth**
+- **AMSI bypass** — patches AmsiScanBuffer
+- **ETW bypass** — patches EtwEventWrite
+- **ntdll unhooking** — loads clean .text from disk
+- **Process hollowing** — CreateProcess suspended + QueueUserAPC
+- **Sandbox detection** — uptime, CPU, hostname, environment checks
+- **Mobile evasion** — anti-emulator, anti-Frida, anti-debug, anti-AV (25+ packages), sandbox timing delay
+
+**Execution**
+- **In-memory BOF** — COFF parser (Windows), memfd_create (Linux)
+- **Shellcode execution** — VirtualAlloc/mmap, zero disk footprint
+- **Process injection** — CreateRemoteThread
+- **22 AD commands** — enumeration, Kerberoasting, DCSync, lateral movement
+
+**Post-Exploitation**
+- **Token manipulation** — steal, make, revert, impersonate
+- **Keylogger** — GetAsyncKeyState (Windows), xinput (Linux)
+- **SOCKS5 proxy** + port forwarding — pivot through agents
+- **Credential harvesting** — browser, WiFi, clipboard, SSH, RDP, vault
+- **5 persistence methods** — registry, schtask, cron, systemd, bashrc
+
+**Payload Generation (16+ types)**
+- **Agent binaries** — Windows EXE, Linux ELF, garble-obfuscated
+- **Web shells** — ASPX, PHP, JSP (token-protected with 404 decoy)
+- **Stagers** — PowerShell, Bash, Python, HTA, VBA macro
+- **Mobile** — Android APK builder (30+ fake app templates), iOS MDM + phishing
+- **Mobile evasion auto-included** — all generated apps bypass security analysis
+
+**Operations**
+- **Engagement reporting** — Markdown + CSV with full activity timeline
+- **Webhook notifications** — Slack/Discord alerts on events
+- **Session recording** — every command logged for documentation
+- **Built-in diagnostics** — `--doctor` flag checks 25+ system requirements
+- **Docker deployment** — `docker-compose up -d` one-liner
+- **Versioning** — CHANGELOG.md, git tags, `--version` flag
 - **Engagement reporting** — auto-generate Markdown/CSV reports with full activity timeline
 - **Webhook notifications** — Slack/Discord alerts on agent registration and events
 - **Session recording** — every command and output logged for documentation
