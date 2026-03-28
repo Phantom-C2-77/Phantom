@@ -80,6 +80,7 @@ func (s *Server) SetupListeners() error {
 			AgentMgr: s.AgentMgr,
 			TaskDisp: s.TaskDisp,
 			OnEvent:  s.handleEvent,
+			Database: s.DB,
 		})
 
 		if err := s.ListenerMgr.Add(l); err != nil {

