@@ -927,10 +927,19 @@ tr.clickable { cursor: pointer; }
 
     <!-- ══════ EVENTS ══════ -->
     <div id="p-events" class="page">
-      <div class="card">
-        <div class="card-header"><h3><span>📜</span> Event Log</h3></div>
-        <div class="card-body">
-          <div class="event-log" id="event-log"><div class="event-item" style="color:var(--text-muted)">No events yet...</div></div>
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px">
+        <div class="card">
+          <div class="card-header"><h3><span>📜</span> Event Log</h3></div>
+          <div class="card-body">
+            <div class="event-log" id="event-log"><div class="event-item" style="color:var(--text-muted)">No events yet...</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3><span>📝</span> Engagement Notes</h3></div>
+          <div class="card-body">
+            <textarea id="engagement-notes-text" placeholder="Document findings, observations, next steps..." onchange="saveEngagementNotes()" style="width:100%;min-height:300px;padding:12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;font-family:monospace;resize:vertical;line-height:1.6"></textarea>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:4px">Auto-saved to browser localStorage</div>
+          </div>
         </div>
       </div>
     </div>
@@ -1073,7 +1082,11 @@ function termLog(type, text) {
   const body = document.getElementById('term-body');
   const div = document.createElement('div');
   div.className = 'term-' + (type || 'output');
-  div.textContent = text;
+  if (type === 'output' || type === 'success') {
+    div.innerHTML = colorizeOutput(text);
+  } else {
+    div.textContent = text;
+  }
   body.appendChild(div);
   body.scrollTop = body.scrollHeight;
 }
@@ -2261,6 +2274,29 @@ async function renameAgent(agentName) {
   refreshAll();
 }
 
+// ──── Colored Terminal Output ────
+function colorizeOutput(text) {
+  if (!text) return '';
+  return text
+    .replace(/\b(error|failed|denied|not found|refused|timeout)\b/gi, '<span style="color:var(--red)">$1</span>')
+    .replace(/\b(success|ok|active|running|complete|found)\b/gi, '<span style="color:var(--green)">$1</span>')
+    .replace(/\b(warning|deprecated|caution)\b/gi, '<span style="color:var(--yellow)">$1</span>')
+    .replace(/(FLAG\{[^}]+\})/g, '<span style="color:#f59e0b;font-weight:bold;background:rgba(245,158,11,0.1);padding:1px 4px;border-radius:3px">$1</span>')
+    .replace(/(\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b)/g, '<span style="color:var(--cyan)">$1</span>')
+    .replace(/(\/[\w\/.]+)/g, '<span style="color:var(--accent-light)">$1</span>');
+}
+
+// ──── Engagement Notes (Global) ────
+let engagementNotes = localStorage.getItem('phantom-engagement-notes') || '';
+
+function saveEngagementNotes() {
+  const el = document.getElementById('engagement-notes-text');
+  if (el) {
+    engagementNotes = el.value;
+    localStorage.setItem('phantom-engagement-notes', engagementNotes);
+  }
+}
+
 // ──── Engagement Timer ────
 const engagementStart = Date.now();
 function updateTimer() {
@@ -2433,6 +2469,9 @@ async function removeAgent(agentId) {
 }
 
 // ──── Init ────
+// Load engagement notes
+const notesEl = document.getElementById('engagement-notes-text');
+if (notesEl) notesEl.value = engagementNotes;
 renderCreds();
 renderMitre();
 loadTemplates();
