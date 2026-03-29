@@ -92,6 +92,12 @@ func (db *Database) UpdateAgentSleep(id string, sleep, jitter int) error {
 	return err
 }
 
+// UpdateAgentName renames an agent.
+func (db *Database) UpdateAgentName(id, name string) error {
+	_, err := db.conn.Exec(`UPDATE agents SET name = ? WHERE id = ?`, name, id)
+	return err
+}
+
 // DeleteAgent removes an agent and all related records (tasks, results, loot).
 func (db *Database) DeleteAgent(id string) error {
 	db.conn.Exec(`DELETE FROM task_results WHERE agent_id = ?`, id)

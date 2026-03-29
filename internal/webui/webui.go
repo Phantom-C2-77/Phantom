@@ -59,6 +59,13 @@ func (w *WebUI) Start() error {
 	mux.HandleFunc("/api/listener/stop", w.auth.AuthMiddleware(w.handleListenerAction))
 	mux.HandleFunc("/api/presets", w.auth.AuthMiddleware(w.handlePresets))
 
+	// Loot & advanced features (auth required)
+	mux.HandleFunc("/api/loot", w.auth.AuthMiddleware(w.handleLoot))
+	mux.HandleFunc("/api/agent/rename", w.auth.AuthMiddleware(w.handleAgentRename))
+	mux.HandleFunc("/api/autotasks", w.auth.AuthMiddleware(w.handleAutoTasks))
+	mux.HandleFunc("/api/auditlog", w.auth.AuthMiddleware(w.handleAuditLog))
+	mux.HandleFunc("/api/templates", w.auth.AuthMiddleware(w.handleCmdTemplates))
+
 	// New features (auth required)
 	mux.HandleFunc("/api/notes", w.auth.AuthMiddleware(w.handleAgentNotes))
 	mux.HandleFunc("/api/search", w.auth.AuthMiddleware(w.handleSearchOutput))
@@ -342,6 +349,14 @@ func (w *WebUI) handleAPICommand(rw http.ResponseWriter, r *http.Request) {
 		writeJSON(rw, map[string]string{"error": err.Error()})
 		return
 	}
+
+	// Audit log
+	session := w.auth.ValidateRequest(r)
+	operator := "unknown"
+	if session != nil {
+		operator = session.Username
+	}
+	AddAuditEntry(operator, agent.Name, protocol.TaskTypeName(taskType), req.Command+" "+req.Args)
 
 	writeJSON(rw, map[string]string{
 		"status":  "queued",
