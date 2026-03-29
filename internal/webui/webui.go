@@ -62,6 +62,11 @@ func (w *WebUI) Start() error {
 	mux.HandleFunc("/api/listener/stop", w.auth.AuthMiddleware(w.handleListenerAction))
 	mux.HandleFunc("/api/presets", w.auth.AuthMiddleware(w.handlePresets))
 
+	// SOCKS Tunnel API (auth required)
+	mux.HandleFunc("/api/tunnel/start", w.auth.AuthMiddleware(w.handleTunnelStart))
+	mux.HandleFunc("/api/tunnel/stop", w.auth.AuthMiddleware(w.handleTunnelStop))
+	mux.HandleFunc("/api/tunnel/list", w.auth.AuthMiddleware(w.handleTunnelList))
+
 	// Loot & advanced features (auth required)
 	mux.HandleFunc("/api/loot", w.auth.AuthMiddleware(w.handleLoot))
 	mux.HandleFunc("/api/agent/rename", w.auth.AuthMiddleware(w.handleAgentRename))

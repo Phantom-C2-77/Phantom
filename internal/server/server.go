@@ -22,6 +22,7 @@ type Server struct {
 	AgentMgr    *agent.Manager
 	TaskDisp    *task.Dispatcher
 	ListenerMgr *listener.Manager
+	TunnelMgr   *TunnelManager
 	EventLog    []string
 	OnEvent     func(string, ...interface{})
 	Webhook     *WebhookNotifier
@@ -53,6 +54,7 @@ func New(cfg *Config) (*Server, error) {
 		AgentMgr:    agent.NewManager(database, cfg.Server.DefaultSleep, cfg.Server.DefaultJitter),
 		TaskDisp:    task.NewDispatcher(database),
 		ListenerMgr: listener.NewManager(),
+		TunnelMgr:   NewTunnelManager(),
 	}
 
 	return s, nil
