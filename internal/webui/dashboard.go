@@ -314,11 +314,15 @@ tr.clickable { cursor: pointer; }
     <div class="tab" onclick="nav('terminal')">Terminal</div>
     <div class="tab" onclick="nav('payloads')">Payloads</div>
     <div class="tab" onclick="nav('files')">Files</div>
+    <div class="tab" onclick="nav('creds')">Creds</div>
     <div class="tab" onclick="nav('events')">Events</div>
   </div>
   <div class="topbar-right">
+    <span class="top-label" id="engagement-timer" title="Engagement duration">⏱ 00:00:00</span>
+    <button onclick="toggleNotifications()" style="background:none;border:none;cursor:pointer;font-size:16px;position:relative" id="notif-btn" title="Toggle browser notifications">🔔</button>
+    <button onclick="exportData()" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--text-muted)" title="Export engagement data">📥 Export</button>
     <div class="pulse"></div>
-    <span class="top-label">Server Online</span>
+    <span class="top-label">Online</span>
   </div>
 </div>
 
@@ -335,6 +339,7 @@ tr.clickable { cursor: pointer; }
     <button class="sidebar-btn" onclick="nav('terminal')" title="Terminal">💻<span class="sb-label">Terminal</span></button>
     <button class="sidebar-btn" onclick="nav('payloads')" title="Payloads">🔧<span class="sb-label">Payloads</span></button>
     <button class="sidebar-btn" onclick="nav('files')" title="Files">📂<span class="sb-label">Files</span></button>
+    <button class="sidebar-btn" onclick="nav('creds')" title="Credentials">🔑<span class="sb-label">Creds</span></button>
     <div class="sidebar-divider"></div>
     <button class="sidebar-btn" onclick="nav('events')" title="Events">📜<span class="sb-label">Events</span></button>
     <div style="flex:1"></div>
@@ -492,6 +497,11 @@ tr.clickable { cursor: pointer; }
           </select>
         </div>
         <span id="agent-badge-area"></span>
+        <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+          <input type="number" id="agent-sleep" placeholder="Sleep" style="width:60px;padding:5px 8px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px" title="Sleep seconds">
+          <input type="number" id="agent-jitter" placeholder="Jitter" style="width:60px;padding:5px 8px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px" title="Jitter %">
+          <button class="qbtn" onclick="updateSleep()" style="font-size:11px;padding:5px 10px" title="Update agent sleep/jitter">Set Sleep</button>
+        </div>
       </div>
 
       <div class="quick-actions">
@@ -738,6 +748,31 @@ tr.clickable { cursor: pointer; }
       </div>
     </div>
 
+    <!-- ══════ CREDENTIALS ══════ -->
+    <div id="p-creds" class="page">
+      <div class="card">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+          <h3><span>🔑</span> Credential Manager</h3>
+          <button class="qbtn" onclick="showAddCred()" style="font-size:11px">+ Add Credential</button>
+        </div>
+        <div class="card-body">
+          <div id="add-cred-form" style="display:none;margin-bottom:16px;padding:14px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius)">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:8px;align-items:end">
+              <div><label style="display:block;font-size:10px;color:var(--text-muted);text-transform:uppercase;margin-bottom:3px">Source</label><input id="cred-source" placeholder="ds-gateway" style="width:100%;padding:6px 8px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px"></div>
+              <div><label style="display:block;font-size:10px;color:var(--text-muted);text-transform:uppercase;margin-bottom:3px">Username</label><input id="cred-user" placeholder="admin" style="width:100%;padding:6px 8px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px"></div>
+              <div><label style="display:block;font-size:10px;color:var(--text-muted);text-transform:uppercase;margin-bottom:3px">Password/Hash</label><input id="cred-pass" placeholder="P@ssword" style="width:100%;padding:6px 8px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px;font-family:monospace"></div>
+              <div><label style="display:block;font-size:10px;color:var(--text-muted);text-transform:uppercase;margin-bottom:3px">Type</label><select id="cred-type" style="width:100%;padding:6px 8px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px"><option>password</option><option>hash</option><option>token</option><option>key</option><option>cookie</option></select></div>
+              <button class="qbtn" onclick="addCred()" style="padding:6px 14px;font-size:12px;background:var(--accent-glow);color:var(--accent-light)">Save</button>
+            </div>
+          </div>
+          <table>
+            <thead><tr><th>Source</th><th>Username</th><th>Password/Hash</th><th>Type</th><th>Added</th><th></th></tr></thead>
+            <tbody id="cred-table"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <!-- ══════ EVENTS ══════ -->
     <div id="p-events" class="page">
       <div class="card">
@@ -795,10 +830,15 @@ async function refreshAll() {
   document.getElementById('s-events').textContent = events.length;
   document.getElementById('s-events-sub').textContent = events.length > 0 ? 'Latest activity tracked' : '—';
 
-  // Agent badge count
+  // Agent badge count + notification
   const sbBadge = document.getElementById('sb-agents');
   if (activeAgents > 0) { sbBadge.style.display='flex'; sbBadge.textContent=activeAgents; }
   else { sbBadge.style.display='none'; }
+  if (activeAgents > lastAgentCount && lastAgentCount > 0) {
+    const newAgent = agents.find(a => a.status === 'active');
+    if (newAgent) notifyNewAgent(newAgent.name, newAgent.hostname);
+  }
+  lastAgentCount = activeAgents;
 
   // Dashboard agents (card view)
   const wrap = document.getElementById('dash-agents-wrap');
@@ -1756,6 +1796,144 @@ async function generatePayload() {
   btn.disabled = false;
 }
 
+// ──── Engagement Timer ────
+const engagementStart = Date.now();
+function updateTimer() {
+  const elapsed = Math.floor((Date.now() - engagementStart) / 1000);
+  const h = String(Math.floor(elapsed/3600)).padStart(2,'0');
+  const m = String(Math.floor((elapsed%3600)/60)).padStart(2,'0');
+  const s = String(elapsed%60).padStart(2,'0');
+  const el = document.getElementById('engagement-timer');
+  if (el) el.textContent = '⏱ ' + h + ':' + m + ':' + s;
+}
+setInterval(updateTimer, 1000);
+
+// ──── Browser Notifications ────
+let notificationsEnabled = false;
+let lastAgentCount = 0;
+function toggleNotifications() {
+  if (!notificationsEnabled) {
+    if ('Notification' in window) {
+      Notification.requestPermission().then(p => {
+        notificationsEnabled = p === 'granted';
+        document.getElementById('notif-btn').style.opacity = notificationsEnabled ? '1' : '0.4';
+      });
+    }
+  } else {
+    notificationsEnabled = false;
+    document.getElementById('notif-btn').style.opacity = '0.4';
+  }
+}
+function notifyNewAgent(name, hostname) {
+  if (notificationsEnabled && 'Notification' in window && Notification.permission === 'granted') {
+    new Notification('Phantom C2 — New Agent', { body: name + ' (' + hostname + ') checked in', icon: '👻' });
+  }
+}
+
+// ──── Keyboard Shortcuts ────
+document.addEventListener('keydown', function(e) {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+  const pages = ['dashboard','agents','listeners','tasks','terminal','payloads','files','creds','events'];
+  if (e.key >= '1' && e.key <= '9' && (e.ctrlKey || e.altKey)) {
+    e.preventDefault();
+    const idx = parseInt(e.key) - 1;
+    if (idx < pages.length) {
+      const btns = document.querySelectorAll('.sidebar-btn');
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.getElementById('p-' + pages[idx]).classList.add('active');
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      btns.forEach(b => b.classList.remove('active'));
+      if (btns[idx]) btns[idx].classList.add('active');
+    }
+  }
+  if (e.key === '/' && !e.ctrlKey) { e.preventDefault(); document.getElementById('term-input').focus(); }
+});
+
+// ──── Sleep/Jitter Control ────
+async function updateSleep() {
+  const agent = document.getElementById('agent-select').value;
+  if (!agent) { alert('Select an agent first'); return; }
+  const sleep = parseInt(document.getElementById('agent-sleep').value);
+  const jitter = parseInt(document.getElementById('agent-jitter').value);
+  if (!sleep || sleep < 1) { alert('Invalid sleep value'); return; }
+  try {
+    const resp = await fetch('/api/cmd', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({agent:agent, command:'sleep', args: sleep + ' ' + (jitter||0)})
+    });
+    const data = await resp.json();
+    if (data.error) { alert(data.error); return; }
+    termLog('system', 'Sleep updated to ' + sleep + 's / ' + (jitter||0) + '% jitter');
+  } catch(e) { alert(e.message); }
+}
+
+// ──── Credential Manager (client-side store) ────
+let credentials = JSON.parse(localStorage.getItem('phantom-creds') || '[]');
+
+function showAddCred() {
+  const form = document.getElementById('add-cred-form');
+  form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
+
+function addCred() {
+  const source = document.getElementById('cred-source').value.trim();
+  const user = document.getElementById('cred-user').value.trim();
+  const pass = document.getElementById('cred-pass').value.trim();
+  const type = document.getElementById('cred-type').value;
+  if (!user || !pass) { alert('Username and password required'); return; }
+  credentials.push({source:source, username:user, password:pass, type:type, added:new Date().toLocaleString()});
+  localStorage.setItem('phantom-creds', JSON.stringify(credentials));
+  document.getElementById('cred-source').value = '';
+  document.getElementById('cred-user').value = '';
+  document.getElementById('cred-pass').value = '';
+  renderCreds();
+}
+
+function removeCred(idx) {
+  credentials.splice(idx, 1);
+  localStorage.setItem('phantom-creds', JSON.stringify(credentials));
+  renderCreds();
+}
+
+function renderCreds() {
+  const table = document.getElementById('cred-table');
+  if (!table) return;
+  if (credentials.length === 0) {
+    table.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px">No credentials stored. Add them manually or they\'ll appear as you harvest them.</td></tr>';
+    return;
+  }
+  table.innerHTML = credentials.map((c,i) => {
+    const typeColors = {password:'var(--green)',hash:'var(--yellow)',token:'var(--blue)',key:'var(--cyan)',cookie:'var(--accent-light)'};
+    return '<tr><td>'+c.source+'</td><td style="font-weight:600">'+c.username+'</td>' +
+      '<td style="font-family:monospace;font-size:12px">'+c.password+'</td>' +
+      '<td><span style="color:'+(typeColors[c.type]||'var(--text-muted)')+';font-size:11px;font-weight:600;text-transform:uppercase">'+c.type+'</span></td>' +
+      '<td style="color:var(--text-muted);font-size:11px">'+c.added+'</td>' +
+      '<td><button class="qbtn" onclick="removeCred('+i+')" style="color:var(--red);font-size:10px;padding:3px 8px">✕</button></td></tr>';
+  }).join('');
+}
+
+// ──── Export Engagement Data ────
+async function exportData() {
+  try {
+    const agents = await fetchJ('/api/agents');
+    const tasks = await fetchJ('/api/tasks');
+    const events = await fetchJ('/api/events') || [];
+    const data = {
+      exported_at: new Date().toISOString(),
+      framework: 'Phantom C2',
+      agents: agents,
+      tasks: tasks,
+      events: events,
+      credentials: credentials
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'phantom-export-' + new Date().toISOString().slice(0,10) + '.json';
+    a.click(); URL.revokeObjectURL(url);
+  } catch(e) { alert('Export failed: ' + e.message); }
+}
+
 // ──── Theme Toggle ────
 function toggleTheme() {
   const html = document.documentElement;
@@ -1790,6 +1968,7 @@ async function removeAgent(agentId) {
 }
 
 // ──── Init ────
+renderCreds();
 refreshAll();
 setInterval(refreshAll, 4000);
 </script>
