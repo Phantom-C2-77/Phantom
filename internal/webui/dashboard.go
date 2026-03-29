@@ -316,6 +316,8 @@ tr.clickable { cursor: pointer; }
     <div class="tab" onclick="nav('files')">Files</div>
     <div class="tab" onclick="nav('creds')">Creds</div>
     <div class="tab" onclick="nav('loot')">Loot</div>
+    <div class="tab" onclick="nav('pivotgraph')">Pivot Map</div>
+    <div class="tab" onclick="nav('ioc')">IOC</div>
     <div class="tab" onclick="nav('templates')">Templates</div>
     <div class="tab" onclick="nav('audit')">Audit</div>
     <div class="tab" onclick="nav('events')">Events</div>
@@ -344,6 +346,8 @@ tr.clickable { cursor: pointer; }
     <button class="sidebar-btn" onclick="nav('files')" title="Files">📂<span class="sb-label">Files</span></button>
     <button class="sidebar-btn" onclick="nav('creds')" title="Credentials">🔑<span class="sb-label">Creds</span></button>
     <button class="sidebar-btn" onclick="nav('loot')" title="Loot">🎯<span class="sb-label">Loot</span></button>
+    <button class="sidebar-btn" onclick="nav('pivotgraph')" title="Pivot Map">🗺️<span class="sb-label">Pivot Map</span></button>
+    <button class="sidebar-btn" onclick="nav('ioc')" title="IOC Tracker">🚨<span class="sb-label">IOC</span></button>
     <div class="sidebar-divider"></div>
     <button class="sidebar-btn" onclick="nav('templates')" title="Command Templates">📑<span class="sb-label">Templates</span></button>
     <button class="sidebar-btn" onclick="nav('audit')" title="Audit Log">📝<span class="sb-label">Audit</span></button>
@@ -617,6 +621,22 @@ tr.clickable { cursor: pointer; }
                 </select>
               </div>
 
+              <!-- Obfuscation options -->
+              <div style="margin-bottom:12px;">
+                <label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Obfuscation Level</label>
+                <div style="display:flex;gap:8px">
+                  <label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;color:var(--text-primary);flex:1;justify-content:center">
+                    <input type="radio" name="pl-obfuscation" value="none" checked> None
+                  </label>
+                  <label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;color:var(--text-primary);flex:1;justify-content:center">
+                    <input type="radio" name="pl-obfuscation" value="strip"> Strip (ldflags -s -w)
+                  </label>
+                  <label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;color:var(--text-primary);flex:1;justify-content:center">
+                    <input type="radio" name="pl-obfuscation" value="garble"> Garble (full obfuscation)
+                  </label>
+                </div>
+              </div>
+
               <button onclick="generatePayload()" class="btn" style="width:100%;padding:12px;font-size:14px;" id="pl-btn">
                 Generate Payload
               </button>
@@ -797,6 +817,66 @@ tr.clickable { cursor: pointer; }
             <button class="qbtn" onclick="loadLoot()" style="font-size:12px">Refresh</button>
           </div>
           <div id="loot-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(350px,1fr));gap:12px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ PIVOT GRAPH ══════ -->
+    <div id="p-pivotgraph" class="page">
+      <div class="card">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+          <h3><span>🗺️</span> Network Pivot Map</h3>
+          <button class="qbtn" onclick="drawPivotGraph()" style="font-size:11px">Refresh</button>
+        </div>
+        <div class="card-body">
+          <canvas id="pivot-canvas" width="900" height="500" style="width:100%;background:var(--bg-input);border-radius:var(--radius);border:1px solid var(--border)"></canvas>
+          <div style="margin-top:10px;display:flex;gap:16px;justify-content:center;font-size:11px;color:var(--text-muted)">
+            <span><span style="color:var(--green)">●</span> Active Agent</span>
+            <span><span style="color:var(--red)">●</span> Dead Agent</span>
+            <span><span style="color:var(--yellow)">●</span> Pivot Host</span>
+            <span style="color:var(--accent-light)">─── SSH Pivot</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ IOC DASHBOARD ══════ -->
+    <div id="p-ioc" class="page">
+      <div class="card">
+        <div class="card-header"><h3><span>🚨</span> Indicators of Compromise (IOC) Dashboard</h3></div>
+        <div class="card-body">
+          <div style="margin-bottom:14px;color:var(--text-muted);font-size:12px">Tracks artifacts generated during the engagement that defenders could detect.</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px" id="ioc-grid">
+            <div class="card" style="margin:0">
+              <div class="card-header"><h3 style="font-size:14px"><span>📂</span> Files Dropped</h3></div>
+              <div class="card-body" id="ioc-files" style="font-family:monospace;font-size:11px;max-height:250px;overflow-y:auto"></div>
+            </div>
+            <div class="card" style="margin:0">
+              <div class="card-header"><h3 style="font-size:14px"><span>🌐</span> Network Connections</h3></div>
+              <div class="card-body" id="ioc-network" style="font-family:monospace;font-size:11px;max-height:250px;overflow-y:auto"></div>
+            </div>
+            <div class="card" style="margin:0">
+              <div class="card-header"><h3 style="font-size:14px"><span>⚙️</span> Processes Created</h3></div>
+              <div class="card-body" id="ioc-procs" style="font-family:monospace;font-size:11px;max-height:250px;overflow-y:auto"></div>
+            </div>
+            <div class="card" style="margin:0">
+              <div class="card-header"><h3 style="font-size:14px"><span>🔧</span> Registry / Persistence</h3></div>
+              <div class="card-body" id="ioc-persist" style="font-family:monospace;font-size:11px;max-height:250px;overflow-y:auto"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+          <h3><span>📜</span> Session Replay</h3>
+          <select id="replay-agent" onchange="loadReplay()" style="padding:6px 10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px">
+            <option value="">Select agent...</option>
+          </select>
+        </div>
+        <div class="card-body">
+          <div id="replay-output" style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:14px;min-height:200px;max-height:400px;overflow-y:auto;font-family:monospace;font-size:11px;white-space:pre-wrap;color:var(--text-muted)">
+            Select an agent to replay its session history.
+          </div>
         </div>
       </div>
     </div>
@@ -1868,6 +1948,167 @@ async function generatePayload() {
   btn.disabled = false;
 }
 
+// ──── Pivot Graph (Canvas) ────
+function drawPivotGraph() {
+  const canvas = document.getElementById('pivot-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  canvas.width = canvas.offsetWidth * 2;
+  canvas.height = 500 * 2;
+  ctx.scale(2, 2);
+  const W = canvas.offsetWidth, H = 500;
+  ctx.clearRect(0, 0, W, H);
+
+  if (!window._cachedAgents || window._cachedAgents.length === 0) {
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-muted');
+    ctx.font = '14px "Segoe UI", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('No agents connected — deploy agents to see the pivot map', W/2, H/2);
+    return;
+  }
+
+  const agents = window._cachedAgents;
+  const c2x = W/2, c2y = 50;
+  const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent-light').trim() || '#a78bfa';
+  const green = '#10b981', red = '#ef4444', yellow = '#f59e0b', muted = '#5a6580';
+  const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text-primary').trim() || '#e8ecf4';
+
+  // Draw C2 server
+  ctx.fillStyle = accent;
+  ctx.beginPath(); ctx.arc(c2x, c2y, 22, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.font = '16px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('C2', c2x, c2y+5);
+  ctx.fillStyle = textColor; ctx.font = '10px sans-serif'; ctx.fillText('Phantom C2', c2x, c2y+38);
+
+  // Group agents by network
+  const networks = {};
+  agents.forEach(a => {
+    const ip = a.ip || '0.0.0.0';
+    const net = ip.split('.').slice(0,3).join('.') + '.0/24';
+    if (!networks[net]) networks[net] = [];
+    networks[net].push(a);
+  });
+
+  const netKeys = Object.keys(networks);
+  const netSpacing = W / (netKeys.length + 1);
+
+  netKeys.forEach((net, ni) => {
+    const nx = netSpacing * (ni + 1);
+    const ny = 140;
+
+    // Network label
+    ctx.fillStyle = yellow;
+    ctx.font = 'bold 10px monospace'; ctx.textAlign = 'center';
+    ctx.fillText(net, nx, ny - 10);
+
+    // Network box
+    const boxH = Math.max(120, networks[net].length * 70 + 30);
+    ctx.strokeStyle = muted; ctx.lineWidth = 1; ctx.setLineDash([4,4]);
+    ctx.strokeRect(nx - 80, ny, 160, boxH);
+    ctx.setLineDash([]);
+
+    // Line from C2 to network
+    ctx.strokeStyle = accent; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(c2x, c2y+22); ctx.lineTo(nx, ny); ctx.stroke();
+
+    // Agents in network
+    networks[net].forEach((a, ai) => {
+      const ax = nx, ay = ny + 35 + ai * 65;
+      const color = a.status === 'active' ? green : red;
+
+      // Agent node
+      ctx.fillStyle = color;
+      ctx.beginPath(); ctx.arc(ax, ay, 16, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(a.os === 'windows' ? 'W' : 'L', ax, ay+4);
+
+      // Agent label
+      ctx.fillStyle = textColor; ctx.font = 'bold 10px sans-serif';
+      ctx.fillText(a.name, ax, ay + 30);
+      ctx.fillStyle = muted; ctx.font = '9px monospace';
+      ctx.fillText(a.ip + ' | ' + a.hostname, ax, ay + 42);
+    });
+  });
+}
+
+// ──── IOC Dashboard ────
+function updateIOC() {
+  if (!window._cachedAgents) return;
+  const agents = window._cachedAgents;
+
+  // Files dropped (agents deployed)
+  const files = document.getElementById('ioc-files');
+  if (files) {
+    files.innerHTML = agents.map(a =>
+      '<div style="padding:4px 0;border-bottom:1px solid var(--border)">' +
+      '<span style="color:var(--red)">'+a.hostname+'</span>: /tmp/agent <span style="color:var(--text-muted)">(Phantom implant)</span></div>'
+    ).join('') || '<div style="color:var(--text-muted)">No files tracked</div>';
+  }
+
+  // Network connections (callbacks)
+  const network = document.getElementById('ioc-network');
+  if (network) {
+    network.innerHTML = agents.map(a =>
+      '<div style="padding:4px 0;border-bottom:1px solid var(--border)">' +
+      '<span style="color:var(--cyan)">'+a.ip+'</span> → 172.20.41.154:8080 <span style="color:var(--text-muted)">(HTTP C2 beacon, '+a.sleep+')</span></div>'
+    ).join('') || '<div style="color:var(--text-muted)">No connections tracked</div>';
+  }
+
+  // Processes
+  const procs = document.getElementById('ioc-procs');
+  if (procs) {
+    procs.innerHTML = agents.map(a =>
+      '<div style="padding:4px 0;border-bottom:1px solid var(--border)">' +
+      '<span style="color:var(--yellow)">'+a.hostname+'</span>: /tmp/agent <span style="color:var(--text-muted)">(PID unknown, '+(a.os==='windows'?'cmd.exe':'/bin/sh')+' child)</span></div>'
+    ).join('') || '<div style="color:var(--text-muted)">No processes tracked</div>';
+  }
+
+  // Persistence
+  const persist = document.getElementById('ioc-persist');
+  if (persist) {
+    persist.innerHTML = '<div style="color:var(--text-muted);padding:8px">Persistence artifacts will appear here when agents install persistence mechanisms (cron, registry, etc.)</div>';
+  }
+
+  // Update replay agent selector
+  const sel = document.getElementById('replay-agent');
+  if (sel) {
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Select agent...</option>' +
+      agents.map(a => '<option value="'+a.name+'" '+(a.name===cur?'selected':'')+'>'+a.name+' ('+a.hostname+')</option>').join('');
+  }
+}
+
+// ──── Session Replay ────
+async function loadReplay() {
+  const agent = document.getElementById('replay-agent').value;
+  const output = document.getElementById('replay-output');
+  if (!agent) { output.textContent = 'Select an agent to replay its session history.'; return; }
+
+  try {
+    const detail = await fetchJ('/api/agent/' + agent);
+    if (!detail.tasks || detail.tasks.length === 0) {
+      output.innerHTML = '<span style="color:var(--text-muted)">No commands executed on this agent yet.</span>';
+      return;
+    }
+
+    output.innerHTML = detail.tasks.map(t => {
+      const cmdColor = t.status === 'complete' ? 'var(--green)' : t.status === 'error' ? 'var(--red)' : 'var(--yellow)';
+      let html = '<div style="margin-bottom:12px">';
+      html += '<span style="color:var(--text-muted);font-size:10px">['+t.time+']</span> ';
+      html += '<span style="color:'+cmdColor+';font-weight:600">'+t.type+'</span> ';
+      html += '<span style="color:var(--cyan)">'+t.args+'</span>';
+      html += ' <span style="font-size:10px;padding:1px 6px;border-radius:3px;background:'+(t.status==='complete'?'var(--green-dim)':t.status==='error'?'var(--red-dim)':'var(--yellow-dim)')+';color:'+(t.status==='complete'?'var(--green)':t.status==='error'?'var(--red)':'var(--yellow)')+'">'+t.status+'</span>';
+      if (t.output) {
+        html += '\n<span style="color:var(--text-secondary)">'+t.output.substring(0,500)+'</span>';
+      }
+      if (t.error) {
+        html += '\n<span style="color:var(--red)">Error: '+t.error+'</span>';
+      }
+      html += '</div>';
+      return html;
+    }).join('<div style="border-top:1px solid var(--border);margin:4px 0"></div>');
+  } catch(e) { output.innerHTML = '<span style="color:var(--red)">'+e.message+'</span>'; }
+}
+
 // ──── Loot Viewer ────
 async function loadLoot() {
   const grid = document.getElementById('loot-grid');
@@ -2202,6 +2443,8 @@ refreshAll();
 setInterval(refreshAll, 4000);
 setInterval(loadAuditLog, 10000);
 setInterval(loadLoot, 15000);
+setInterval(function(){ drawPivotGraph(); updateIOC(); }, 5000);
+setTimeout(function(){ drawPivotGraph(); updateIOC(); }, 2000);
 </script>
 </body>
 </html>`
