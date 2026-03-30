@@ -560,11 +560,47 @@ tr.clickable { cursor: pointer; }
               </div>
               <button class="btn" onclick="termExecuteAssembly()" style="padding:6px 16px;font-size:12px;white-space:nowrap">⚡ Run</button>
             </div>
-            <div style="display:flex;flex-wrap:wrap;gap:4px">
-              <button class="qbtn" onclick="document.getElementById('term-asm-args').value='-group=all'" style="font-size:9px;padding:3px 8px">Seatbelt -group=all</button>
-              <button class="qbtn" onclick="document.getElementById('term-asm-args').value='kerberoast'" style="font-size:9px;padding:3px 8px">Rubeus kerberoast</button>
-              <button class="qbtn" onclick="document.getElementById('term-asm-args').value='-c All'" style="font-size:9px;padding:3px 8px">SharpHound -c All</button>
-              <button class="qbtn" onclick="document.getElementById('term-asm-args').value='find /vulnerable'" style="font-size:9px;padding:3px 8px">Certify vulnerable</button>
+            <div style="margin-top:6px">
+              <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Seatbelt</div>
+              <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px">
+                <button class="qbtn" onclick="document.getElementById('term-asm-args').value='-group=all'" style="font-size:9px;padding:2px 7px">-group=all</button>
+                <button class="qbtn" onclick="document.getElementById('term-asm-args').value='-group=user'" style="font-size:9px;padding:2px 7px">-group=user</button>
+                <button class="qbtn" onclick="document.getElementById('term-asm-args').value='-group=system'" style="font-size:9px;padding:2px 7px">-group=system</button>
+                <button class="qbtn" onclick="document.getElementById('term-asm-args').value='-group=misc'" style="font-size:9px;padding:2px 7px">-group=misc</button>
+                <button class="qbtn" onclick="document.getElementById('term-asm-args').value='CredEnum'" style="font-size:9px;padding:2px 7px">CredEnum</button>
+                <button class="qbtn" onclick="document.getElementById('term-asm-args').value='DotNet'" style="font-size:9px;padding:2px 7px">DotNet</button>
+              </div>
+              <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Rubeus</div>
+              <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px">
+                <button class="qbtn" onclick="document.getElementById('term-asm-args').value='kerberoast'" style="font-size:9px;padding:2px 7px">kerberoast</button>
+                <button class="qbtn" onclick="document.getElementById('term-asm-args').value='asreproast'" style="font-size:9px;padding:2px 7px">asreproast</button>
+                <button class="qbtn" onclick="document.getElementById('term-asm-args').value='triage'" style="font-size:9px;padding:2px 7px">triage</button>
+                <button class="qbtn" onclick="document.getElementById('term-asm-args').value='klist'" style="font-size:9px;padding:2px 7px">klist</button>
+                <button class="qbtn" onclick="document.getElementById('term-asm-args').value='dump'" style="font-size:9px;padding:2px 7px">dump</button>
+                <button class="qbtn" onclick="document.getElementById('term-asm-args').value='monitor /interval:5'" style="font-size:9px;padding:2px 7px">monitor</button>
+                <button class="qbtn" onclick="document.getElementById('term-asm-args').value='s4u /user:admin /rc4:HASH /impersonateuser:administrator /msdsspn:cifs/target /ptt'" style="font-size:9px;padding:2px 7px">s4u</button>
+                <button class="qbtn" onclick="document.getElementById('term-asm-args').value='hash /password:Password123!'" style="font-size:9px;padding:2px 7px">hash</button>
+              </div>
+              <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">SharpHound / Certify / SharpUp</div>
+              <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px">
+                <button class="qbtn" onclick="document.getElementById('term-asm-args').value='-c All'" style="font-size:9px;padding:2px 7px">SharpHound -c All</button>
+                <button class="qbtn" onclick="document.getElementById('term-asm-args').value='-c DCOnly'" style="font-size:9px;padding:2px 7px">SharpHound DCOnly</button>
+                <button class="qbtn" onclick="document.getElementById('term-asm-args').value='find /vulnerable'" style="font-size:9px;padding:2px 7px">Certify vulnerable</button>
+                <button class="qbtn" onclick="document.getElementById('term-asm-args').value='cas'" style="font-size:9px;padding:2px 7px">Certify cas</button>
+                <button class="qbtn" onclick="document.getElementById('term-asm-args').value='audit'" style="font-size:9px;padding:2px 7px">SharpUp audit</button>
+                <button class="qbtn" onclick="document.getElementById('term-asm-args').value='all'" style="font-size:9px;padding:2px 7px">SharpUp all</button>
+              </div>
+              <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">SharpDPAPI / SharpChrome / SharpView</div>
+              <div style="display:flex;flex-wrap:wrap;gap:3px">
+                <button class="qbtn" onclick="document.getElementById('term-asm-args').value='triage'" style="font-size:9px;padding:2px 7px">DPAPI triage</button>
+                <button class="qbtn" onclick="document.getElementById('term-asm-args').value='masterkeys'" style="font-size:9px;padding:2px 7px">DPAPI masterkeys</button>
+                <button class="qbtn" onclick="document.getElementById('term-asm-args').value='logins'" style="font-size:9px;padding:2px 7px">Chrome logins</button>
+                <button class="qbtn" onclick="document.getElementById('term-asm-args').value='cookies'" style="font-size:9px;padding:2px 7px">Chrome cookies</button>
+                <button class="qbtn" onclick="document.getElementById('term-asm-args').value='Get-DomainUser'" style="font-size:9px;padding:2px 7px">Get-DomainUser</button>
+                <button class="qbtn" onclick="document.getElementById('term-asm-args').value='Get-DomainComputer'" style="font-size:9px;padding:2px 7px">Get-DomainComputer</button>
+                <button class="qbtn" onclick="document.getElementById('term-asm-args').value='Get-DomainGroup'" style="font-size:9px;padding:2px 7px">Get-DomainGroup</button>
+                <button class="qbtn" onclick="document.getElementById('term-asm-args').value='Find-DomainShare'" style="font-size:9px;padding:2px 7px">Find-DomainShare</button>
+              </div>
             </div>
           </div>
         </div>
