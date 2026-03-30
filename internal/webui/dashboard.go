@@ -515,22 +515,6 @@ tr.clickable { cursor: pointer; }
         </div>
       </div>
 
-      <div class="quick-actions">
-        <button class="qbtn" onclick="sendShell('whoami')">whoami</button>
-        <button class="qbtn" onclick="sendShell('id')">id</button>
-        <button class="qbtn" onclick="sendShell('hostname')">hostname</button>
-        <button class="qbtn" onclick="quickCmd('sysinfo')">sysinfo</button>
-        <button class="qbtn" onclick="quickCmd('ps')">ps</button>
-        <button class="qbtn" onclick="quickCmd('screenshot')">screenshot</button>
-        <button class="qbtn" onclick="quickCmd('evasion')">evasion</button>
-        <button class="qbtn" onclick="sendShell('ipconfig /all')">ipconfig</button>
-        <button class="qbtn" onclick="sendShell('ifconfig')">ifconfig</button>
-        <button class="qbtn danger" onclick="quickCmd('kill')">kill</button>
-        <span style="color:var(--border);margin:0 4px">|</span>
-        <button class="qbtn" onclick="startTunnel()" style="background:var(--blue-dim);color:var(--blue)">SOCKS Proxy</button>
-        <button class="qbtn" onclick="stopTunnel()" style="background:var(--red-dim);color:var(--red);font-size:10px">Stop Tunnel</button>
-      </div>
-
       <div class="terminal">
         <div class="term-bar">
           <div class="term-dot r"></div><div class="term-dot y"></div><div class="term-dot g"></div>
@@ -1363,13 +1347,31 @@ function selectAgent(name) {
   nav('terminal');
 }
 
+var currentTermAgent = '';
+
 function onAgentSelect() {
-  const name = document.getElementById('agent-select').value;
-  if (name) {
-    document.getElementById('term-prompt').innerHTML = 'phantom [<span style="color:var(--cyan)">'+name+'</span>] &gt;';
-    document.getElementById('term-title').textContent = 'Phantom C2 — ' + name;
-    termLog('info', '✓ Interacting with ' + name);
+  var name = document.getElementById('agent-select').value;
+  if (!name) return;
+
+  // Save current agent terminal
+  if (currentTermAgent) {
+    agentTerminals[currentTermAgent] = { html: document.getElementById('term-body').innerHTML };
   }
+
+  // Switch to new agent
+  currentTermAgent = name;
+  document.getElementById('term-prompt').innerHTML = 'phantom [<span style="color:var(--cyan)">'+name+'</span>] &gt;';
+  document.getElementById('term-title').textContent = 'Phantom C2 — ' + name;
+
+  // Restore or init terminal for this agent
+  if (agentTerminals[name]) {
+    document.getElementById('term-body').innerHTML = agentTerminals[name].html;
+  } else {
+    document.getElementById('term-body').innerHTML = '<div class="term-info">✓ Session started with ' + name + '</div>';
+  }
+
+  // Update tabs
+  if (window._cachedAgents) updateAgentTabs(window._cachedAgents);
 }
 
 // ──── Terminal ────
