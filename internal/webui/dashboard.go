@@ -379,7 +379,7 @@ tr.clickable { cursor: pointer; }
       <div class="card">
         <div class="card-header"><h3><span>🌐</span> Network Graph</h3><span style="font-size:11px;color:var(--text-muted)">Beacon topology</span></div>
         <div class="card-body" style="padding:0; background:#080c16;">
-          <canvas id="network-graph" height="200" style="width:100%;"></canvas>
+          <canvas id="network-graph" height="320" style="width:100%;cursor:default;"></canvas>
         </div>
       </div>
 
@@ -1362,99 +1362,162 @@ function drawNetworkGraph(agents) {
   const canvas = document.getElementById('network-graph');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
-  const w = canvas.width = canvas.parentElement.clientWidth;
-  const h = canvas.height = 200;
-
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.parentElement.clientWidth;
+  const h = 320;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+  ctx.scale(dpr, dpr);
   ctx.clearRect(0, 0, w, h);
 
-  // Draw C2 server node in center-top
-  const serverX = w / 2, serverY = 40;
+  const colors = {
+    bg: '#080c16', grid: 'rgba(42,48,80,0.3)',
+    c2: '#7c3aed', c2glow: 'rgba(124,58,237,0.3)',
+    active: '#10b981', dead: '#ef4444', dormant: '#f59e0b',
+    line: 'rgba(124,58,237,0.4)', arrow: '#a78bfa',
+    text: '#8892b0', dim: '#5a6580', white: '#e8ecf4'
+  };
 
-  // Server node
-  ctx.beginPath();
-  ctx.arc(serverX, serverY, 20, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(124,58,237,0.2)';
-  ctx.fill();
-  ctx.strokeStyle = '#7c3aed';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  ctx.fillStyle = '#a78bfa';
-  ctx.font = 'bold 11px Inter';
-  ctx.textAlign = 'center';
-  ctx.fillText('C2', serverX, serverY + 4);
+  // Grid background
+  ctx.strokeStyle = colors.grid; ctx.lineWidth = 0.5;
+  for (let x = 0; x < w; x += 40) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke(); }
+  for (let y = 0; y < h; y += 40) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke(); }
 
-  // Server label
-  ctx.fillStyle = '#5a6580';
-  ctx.font = '10px Inter';
-  ctx.fillText('Phantom Server', serverX, serverY + 35);
+  // ── C2 SERVER (tower icon at top center) ──
+  const sx = w/2, sy = 45;
+
+  // Server tower
+  ctx.fillStyle = colors.c2glow;
+  ctx.fillRect(sx-18, sy-25, 36, 40);
+  ctx.strokeStyle = colors.c2; ctx.lineWidth = 1.5;
+  ctx.strokeRect(sx-18, sy-25, 36, 40);
+  // Server slots
+  for (let i = 0; i < 3; i++) {
+    ctx.fillStyle = colors.c2;
+    ctx.fillRect(sx-12, sy-20+i*12, 20, 6);
+    ctx.fillStyle = i===0?colors.active:colors.arrow;
+    ctx.beginPath(); ctx.arc(sx+12, sy-17+i*12, 2, 0, Math.PI*2); ctx.fill();
+  }
+  // Server base
+  ctx.fillStyle = colors.c2; ctx.fillRect(sx-22, sy+16, 44, 4);
+
+  // Label
+  ctx.fillStyle = colors.white; ctx.font = 'bold 11px Inter'; ctx.textAlign = 'center';
+  ctx.fillText('PHANTOM C2', sx, sy+35);
+  ctx.fillStyle = colors.dim; ctx.font = '9px JetBrains Mono';
+  ctx.fillText('172.20.41.154:8080', sx, sy+47);
 
   if (agents.length === 0) {
-    ctx.fillStyle = '#3a4060';
-    ctx.font = '12px Inter';
-    ctx.fillText('Deploy agents to see the network graph', w/2, h/2 + 20);
+    ctx.fillStyle = colors.dim; ctx.font = '13px Inter';
+    ctx.fillText('Waiting for beacons...', w/2, h/2+30);
     return;
   }
 
-  // Agent nodes in a row below
-  const agentY = 140;
-  const agentSpacing = Math.min(120, (w - 80) / agents.length);
-  const startX = (w - (agents.length - 1) * agentSpacing) / 2;
+  // Group by OS
+  const winAgents = agents.filter(a => a.os === 'windows');
+  const linAgents = agents.filter(a => a.os !== 'windows');
 
-  agents.forEach((a, i) => {
-    const ax = startX + i * agentSpacing;
-    const statusColor = a.status === 'active' ? '#10b981' : a.status === 'dormant' ? '#f59e0b' : '#ef4444';
-    const osIcon = a.os === 'windows' ? '🪟' : a.os === 'linux' ? '🐧' : a.os === 'android' ? '📱' : '💻';
+  function drawComputerIcon(x, y, a) {
+    const sc = a.status==='active'?colors.active:a.status==='dormant'?colors.dormant:colors.dead;
+    const isWin = a.os === 'windows';
 
-    // Connection line (server → agent)
-    ctx.beginPath();
-    ctx.moveTo(serverX, serverY + 20);
-    // Curved line
-    const cpY = (serverY + agentY) / 2;
-    ctx.quadraticCurveTo(ax, cpY - 10, ax, agentY - 18);
-    ctx.strokeStyle = statusColor;
-    ctx.lineWidth = 1.5;
-    ctx.globalAlpha = 0.5;
-    ctx.stroke();
-    ctx.globalAlpha = 1;
+    // Connection line from C2 → agent
+    ctx.beginPath(); ctx.moveTo(sx, sy+20);
+    const mid = (sy+20+y-20)/2;
+    ctx.bezierCurveTo(sx, mid, x, mid, x, y-20);
+    ctx.strokeStyle = sc; ctx.lineWidth = 1.5; ctx.globalAlpha = 0.5;
+    ctx.setLineDash([6,3]); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
 
-    // Animated dash for active agents
-    if (a.status === 'active') {
-      ctx.setLineDash([4, 4]);
-      ctx.beginPath();
-      ctx.moveTo(serverX, serverY + 20);
-      ctx.quadraticCurveTo(ax, cpY - 10, ax, agentY - 18);
-      ctx.strokeStyle = statusColor;
-      ctx.lineWidth = 1;
-      ctx.globalAlpha = 0.8;
-      ctx.stroke();
+    // Arrow head
+    ctx.fillStyle = sc;
+    ctx.beginPath(); ctx.moveTo(x, y-20); ctx.lineTo(x-4, y-28); ctx.lineTo(x+4, y-28); ctx.fill();
+
+    // Monitor body
+    ctx.fillStyle = a.status==='active'?'rgba(16,185,129,0.08)':'rgba(239,68,68,0.05)';
+    const mw = 44, mh = 30;
+    ctx.fillRect(x-mw/2, y-mh/2, mw, mh);
+    ctx.strokeStyle = sc; ctx.lineWidth = 1.5;
+    ctx.strokeRect(x-mw/2, y-mh/2, mw, mh);
+
+    // Screen content
+    if (isWin) {
+      // Windows logo
+      ctx.fillStyle = sc; ctx.globalAlpha = 0.7;
+      ctx.fillRect(x-8, y-10, 7, 7); ctx.fillRect(x+1, y-10, 7, 7);
+      ctx.fillRect(x-8, y-1, 7, 7); ctx.fillRect(x+1, y-1, 7, 7);
       ctx.globalAlpha = 1;
-      ctx.setLineDash([]);
+    } else {
+      // Linux terminal
+      ctx.fillStyle = sc; ctx.font = 'bold 10px monospace'; ctx.textAlign = 'center';
+      ctx.fillText('>_', x, y+3);
     }
 
-    // Agent node — circle with glow
-    ctx.beginPath();
-    ctx.arc(ax, agentY, 16, 0, Math.PI * 2);
-    ctx.fillStyle = a.status === 'active' ? 'rgba(16,185,129,0.15)' : a.status === 'dormant' ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)';
-    ctx.fill();
-    ctx.strokeStyle = statusColor;
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    // Monitor stand
+    ctx.strokeStyle = sc; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, y+mh/2); ctx.lineTo(x, y+mh/2+6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x-8, y+mh/2+6); ctx.lineTo(x+8, y+mh/2+6); ctx.stroke();
 
-    // Agent icon
-    ctx.font = '14px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(osIcon, ax, agentY + 5);
+    // Status LED
+    ctx.beginPath(); ctx.arc(x+mw/2-5, y-mh/2+5, 3, 0, Math.PI*2);
+    ctx.fillStyle = sc; ctx.fill();
+    if (a.status === 'active') {
+      ctx.beginPath(); ctx.arc(x+mw/2-5, y-mh/2+5, 6, 0, Math.PI*2);
+      ctx.fillStyle = sc.replace(')', ',0.2)').replace('rgb','rgba');
+      ctx.fill();
+    }
+
+    // Hostname
+    ctx.fillStyle = colors.white; ctx.font = 'bold 10px Inter'; ctx.textAlign = 'center';
+    const label = a.hostname || a.name;
+    ctx.fillText(label.length > 14 ? label.substring(0,12)+'..' : label, x, y+mh/2+20);
+
+    // Username@IP
+    ctx.fillStyle = colors.dim; ctx.font = '8px JetBrains Mono';
+    ctx.fillText((a.username?a.username+'@':'')+a.ip, x, y+mh/2+30);
 
     // Agent name
-    ctx.fillStyle = '#8892b0';
-    ctx.font = '9px Inter';
-    ctx.fillText(a.name.length > 12 ? a.name.substring(0, 10) + '..' : a.name, ax, agentY + 32);
+    ctx.fillStyle = colors.arrow; ctx.font = '8px Inter';
+    ctx.fillText(a.name, x, y+mh/2+40);
 
-    // IP
-    ctx.fillStyle = '#5a6580';
-    ctx.font = '8px JetBrains Mono';
-    ctx.fillText(a.ip, ax, agentY + 43);
+    // Status badge
+    const badgeText = a.status.toUpperCase();
+    const tw = ctx.measureText(badgeText).width + 8;
+    ctx.fillStyle = sc.replace(')', ',0.15)').replace('rgb','rgba').replace('#','');
+    // Use hex color for badge bg
+    ctx.globalAlpha = 0.2; ctx.fillStyle = sc;
+    ctx.fillRect(x-tw/2, y-mh/2-14, tw, 12); ctx.globalAlpha = 1;
+    ctx.fillStyle = sc; ctx.font = 'bold 7px Inter';
+    ctx.fillText(badgeText, x, y-mh/2-5);
+  }
+
+  // Layout: Windows agents on left, Linux on right
+  const allAgents = [...winAgents, ...linAgents];
+  const cols = Math.min(allAgents.length, Math.floor(w / 130));
+  const rows = Math.ceil(allAgents.length / cols);
+  const colW = w / (cols + 1);
+  const rowH = (h - 120) / Math.max(rows, 1);
+  const startY = 140;
+
+  allAgents.forEach((a, i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const x = colW * (col + 1);
+    const y = startY + row * rowH;
+    drawComputerIcon(x, y, a);
   });
+
+  // Legend
+  ctx.globalAlpha = 0.7;
+  ctx.font = '9px Inter'; ctx.textAlign = 'left';
+  const ly = h - 12;
+  ctx.fillStyle = colors.active; ctx.fillRect(10, ly-8, 8, 8);
+  ctx.fillStyle = colors.text; ctx.fillText('Active', 22, ly);
+  ctx.fillStyle = colors.dormant; ctx.fillRect(70, ly-8, 8, 8);
+  ctx.fillStyle = colors.text; ctx.fillText('Dormant', 82, ly);
+  ctx.fillStyle = colors.dead; ctx.fillRect(140, ly-8, 8, 8);
+  ctx.fillStyle = colors.text; ctx.fillText('Dead', 152, ly);
+  ctx.fillStyle = colors.arrow; ctx.fillText('─ ─ ─ Beacon Link', 200, ly);
+  ctx.globalAlpha = 1;
 }
 
 function updateSessionHealth(agents) {
