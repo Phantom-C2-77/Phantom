@@ -2711,11 +2711,35 @@ async function executeAssemblyUpload() {
 
   result.innerHTML = '<span style="color:var(--yellow)">Reading file & uploading...</span>';
 
-  // Read file as base64
+  // Read file as base64 (chunked to avoid stack overflow on large files)
   const reader = new FileReader();
   reader.onload = async function() {
-    const b64 = btoa(String.fromCharCode(...new Uint8Array(reader.result)));
-    const cmdArgs = 'inline ' + b64 + (args ? ' ' + args : '');
+    const bytes = new Uint8Array(reader.result);
+    let binary = '';
+    const chunkSize = 8192;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+    }
+    const b64 = btoa(binary);
+
+    // Upload the file to the agent instead of sending inline (more reliable for large assemblies)
+    const formData = new FormData();
+    formData.append('agent', agent);
+    formData.append('file', file);
+    formData.append('remote_path', 'C:\\Users\\Public\\' + file.name);
+
+    result.innerHTML = '<span style="color:var(--yellow)">Uploading assembly to agent...</span>';
+
+    // Step 1: Upload the file
+    try {
+      const uploadResp = await fetch('/api/upload-to-agent', {method:'POST', body:formData});
+      const uploadData = await uploadResp.json();
+      if (uploadData.error) { result.innerHTML = '<span style="color:var(--red)">Upload failed: '+uploadData.error+'</span>'; return; }
+    } catch(e) { result.innerHTML = '<span style="color:var(--red)">Upload error: '+e.message+'</span>'; return; }
+
+    // Step 2: Execute the uploaded assembly
+    const remotePath = 'C:\\Users\\Public\\' + file.name;
+    const cmdArgs = remotePath + (args ? ' ' + args : '');
 
     try {
       const resp = await fetch('/api/cmd', {
