@@ -454,6 +454,8 @@ tr.clickable { cursor: pointer; }
               <select id="ln-type" style="width:100%;padding:8px 10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;">
                 <option value="http">HTTP</option>
                 <option value="https">HTTPS</option>
+                <option value="tcp">TCP (Raw)</option>
+                <option value="dns">DNS</option>
               </select>
             </div>
             <div>
