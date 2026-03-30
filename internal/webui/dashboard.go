@@ -1078,10 +1078,10 @@ tr.clickable { cursor: pointer; }
               </div>
               <div style="margin-bottom:8px">
                 <label style="display:block;font-size:10px;color:var(--text-muted);text-transform:uppercase;margin-bottom:3px">.NET Assembly (.exe)</label>
+                <input type="file" id="asm-file" style="display:none" accept=".exe,.dll" onchange="asmFileSelected(this)">
                 <div style="padding:14px;border:2px dashed var(--border);border-radius:var(--radius);text-align:center;cursor:pointer" onclick="document.getElementById('asm-file').click()" id="asm-dropzone">
                   <div style="font-size:20px;margin-bottom:4px">⚡</div>
-                  <div style="font-size:11px;color:var(--text-muted)">Drop .NET assembly here</div>
-                  <input type="file" id="asm-file" style="display:none" accept=".exe,.dll" onchange="asmFileSelected(this)">
+                  <div style="font-size:11px;color:var(--text-muted)">Click to select .NET assembly</div>
                 </div>
               </div>
               <div style="margin-bottom:8px">
