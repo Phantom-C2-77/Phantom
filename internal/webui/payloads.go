@@ -198,7 +198,22 @@ func (w *WebUI) buildAgentBinary(req PayloadRequest) PayloadResponse {
 	if obfuscate {
 		garblePath, err := exec.LookPath("garble")
 		if err != nil {
-			return PayloadResponse{Success: false, Message: "garble not installed: go install mvdan.cc/garble@latest"}
+			// Check common install locations
+			home, _ := os.UserHomeDir()
+			for _, c := range []string{
+				filepath.Join(home, "go", "bin", "garble"),
+				"/usr/local/go/bin/garble",
+				"/usr/local/bin/garble",
+			} {
+				if _, e := os.Stat(c); e == nil {
+					garblePath = c
+					err = nil
+					break
+				}
+			}
+			if err != nil {
+				return PayloadResponse{Success: false, Message: "garble not installed: go install mvdan.cc/garble@latest"}
+			}
 		}
 		cmd = exec.Command(garblePath, "-literals", "-tiny", "-seed=random",
 			"build", "-ldflags", ldflags, "-o", outputPath, "./cmd/agent")
