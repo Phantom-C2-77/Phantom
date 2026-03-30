@@ -72,9 +72,11 @@ body { background: var(--bg-primary); color: var(--text-primary); font-family: '
   border-bottom: 1px solid var(--border);
   padding: 0 20px;
   height: 52px;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: nowrap;
   position: sticky; top: 0; z-index: 200;
 }
 .topbar-left { display: flex; align-items: center; gap: 14px; }
