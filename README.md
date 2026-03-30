@@ -1,16 +1,22 @@
 # Phantom C2
 
 ```
-    ___  __  __   ___   _  __ ______ ____   __  ___
-   / _ \/ / / /  / _ | / |/ //_  __// __ \ /  |/  /
-  / ___/ /_/ /  / __ |/    /  / /  / /_/ // /|_/ /
- /_/   \____/  /_/ |_/_/|_/  /_/   \____//_/  /_/
+                          ___
+                     ____/   \____
+                ____/    _   _    \____
+           ____/   _____/ \_/ \_____   \____
+      ____/  _____/   PHANTOM C2   \_____  \____
+     /______/____________________________\______\
+            \___        ✦        ___/
+                \_______•_______/
 
-  [::] Phantom C2 Framework — Red Team Operations
+     [::] Phantom C2 Framework — Red Team Operations
+     [::] Stealth • Precision • Control
 ```
 
 <p align="center">
-  <strong>A modern Command & Control framework for authorized red team engagements</strong>
+  <strong>A modern Command & Control framework for authorized red team engagements</strong><br>
+  <em>Inspired by the B-2 Spirit — invisible, precise, and lethal</em>
 </p>
 
 <p align="center">
