@@ -152,10 +152,20 @@ func (m *Manager) RefreshStatuses() error {
 		threshold := time.Duration(a.Sleep) * time.Second
 
 		var newStatus string
+		// Use generous thresholds to avoid false dormant/dead during long-running tasks
+		// Minimum thresholds: 5 minutes for dormant, 15 minutes for dead
+		dormantThreshold := threshold * 5
+		if dormantThreshold < 5*time.Minute {
+			dormantThreshold = 5 * time.Minute
+		}
+		deadThreshold := threshold * 20
+		if deadThreshold < 15*time.Minute {
+			deadThreshold = 15 * time.Minute
+		}
 		switch {
-		case elapsed > threshold*10:
+		case elapsed > deadThreshold:
 			newStatus = protocol.AgentDead
-		case elapsed > threshold*3:
+		case elapsed > dormantThreshold:
 			newStatus = protocol.AgentDormant
 		default:
 			newStatus = protocol.AgentActive
