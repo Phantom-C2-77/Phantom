@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/base64"
 	"flag"
 	"fmt"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"syscall"
 
 	"github.com/phantom-c2/phantom/internal/cli"
+	phcrypto "github.com/phantom-c2/phantom/internal/crypto"
 	"github.com/phantom-c2/phantom/internal/server"
 	"github.com/phantom-c2/phantom/internal/webui"
 )
@@ -163,6 +165,29 @@ func main() {
 	// Auto-build agent binaries if they don't exist
 	agentDir := "build/agents"
 	os.MkdirAll(agentDir, 0755)
+
+	// Determine listener URL for agents from first configured listener
+	agentCallbackURL := "https://127.0.0.1:443"
+	for _, lc := range cfg.Listeners {
+		scheme := "https"
+		if lc.Type == "http" {
+			scheme = "http"
+		}
+		agentCallbackURL = fmt.Sprintf("%s://0.0.0.0%s", scheme, lc.Bind[strings.LastIndex(lc.Bind, ":"):])
+		break
+	}
+
+	// Get RSA public key for embedding
+	module := "github.com/phantom-c2/phantom/internal/implant"
+	ldflags := fmt.Sprintf("-s -w -X '%s.ListenerURL=%s' -X '%s.SleepSeconds=5' -X '%s.JitterPercent=20'", module, agentCallbackURL, module, module)
+	if srv.PubKey != nil {
+		keyBytes, err := phcrypto.PublicKeyToBytes(srv.PubKey)
+		if err == nil {
+			b64Key := base64.StdEncoding.EncodeToString(keyBytes)
+			ldflags += fmt.Sprintf(" -X '%s.ServerPubKey=%s'", module, b64Key)
+		}
+	}
+
 	for _, target := range []struct{ goos, suffix string }{
 		{"linux", "phantom-agent_linux_amd64"},
 		{"windows", "phantom-agent_windows_amd64.exe"},
@@ -170,7 +195,7 @@ func main() {
 		agentPath := agentDir + "/" + target.suffix
 		if _, err := os.Stat(agentPath); err != nil {
 			cli.Info("Auto-building %s agent...", target.goos)
-			buildCmd := exec.Command("go", "build", "-ldflags", "-s -w", "-o", agentPath, "./cmd/agent")
+			buildCmd := exec.Command("go", "build", "-ldflags", ldflags, "-o", agentPath, "./cmd/agent")
 			buildCmd.Dir = findProjectRoot()
 			buildCmd.Env = append(os.Environ(), "GOOS="+target.goos, "GOARCH=amd64", "CGO_ENABLED=0")
 			if out, err := buildCmd.CombinedOutput(); err != nil {
