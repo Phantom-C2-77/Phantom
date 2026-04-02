@@ -352,6 +352,9 @@ func (imp *Implant) executeTask(task protocol.Task) *protocol.TaskResult {
 	case protocol.TaskInitAccess:
 		output, err = ExecuteInitAccess(task.Args)
 
+	case protocol.TaskIfconfig:
+		output, err = GetNetworkInterfaces()
+
 	default:
 		err = errMissingArgs("unknown task type")
 	}

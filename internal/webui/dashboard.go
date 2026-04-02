@@ -1049,6 +1049,7 @@ tr.clickable { cursor: pointer; }
           <div style="display:flex;gap:8px;margin-bottom:12px">
             <select id="at-cmd" style="padding:8px 10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px;width:150px">
               <option value="sysinfo">sysinfo</option>
+              <option value="ifconfig">ifconfig</option>
               <option value="shell">shell</option>
               <option value="ps">ps</option>
               <option value="screenshot">screenshot</option>

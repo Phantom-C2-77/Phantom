@@ -31,6 +31,7 @@ type TransferState struct {
 	Checksum    string `json:"checksum"`
 	Complete    bool   `json:"complete"`
 	Error       string `json:"error,omitempty"`
+	mu          sync.Mutex `json:"-"` // Protects file write operations
 }
 
 // TransferManager manages chunked file transfers.
@@ -119,6 +120,7 @@ func ChunkedDownload(localPath string, totalSize int64, checksum string) (*Trans
 }
 
 // WriteChunk writes a received chunk to the download file.
+// Thread-safe: uses mutex to protect file writes and state updates.
 func WriteChunk(transferID string, chunkIdx int, data []byte) error {
 	transferMgr.mu.Lock()
 	state, ok := transferMgr.transfers[transferID]
@@ -127,6 +129,10 @@ func WriteChunk(transferID string, chunkIdx int, data []byte) error {
 		return fmt.Errorf("transfer %s not found", transferID)
 	}
 
+	// Use state-level mutex for thread-safe file writes
+	state.mu.Lock()
+	defer state.mu.Unlock()
+
 	f, err := os.OpenFile(state.Filename, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
@@ -134,15 +140,18 @@ func WriteChunk(transferID string, chunkIdx int, data []byte) error {
 	defer f.Close()
 
 	offset := int64(chunkIdx) * int64(state.ChunkSize)
-	f.WriteAt(data, offset)
+	if _, err := f.WriteAt(data, offset); err != nil {
+		return fmt.Errorf("write chunk %d failed: %w", chunkIdx, err)
+	}
+	if err := f.Sync(); err != nil {
+		return fmt.Errorf("sync chunk %d failed: %w", chunkIdx, err)
+	}
 
-	transferMgr.mu.Lock()
 	state.ChunksDone++
 	state.Transferred += int64(len(data))
 	if state.ChunksDone >= state.TotalChunks {
 		state.Complete = true
 	}
-	transferMgr.mu.Unlock()
 
 	return nil
 }
@@ -156,4 +165,18 @@ func GetTransferProgress() []TransferState {
 		result = append(result, *t)
 	}
 	return result
+}
+
+// CleanupCompletedTransfers removes finished transfers from memory.
+func CleanupCompletedTransfers() int {
+	transferMgr.mu.Lock()
+	defer transferMgr.mu.Unlock()
+	cleaned := 0
+	for id, t := range transferMgr.transfers {
+		if t.Complete || t.Error != "" {
+			delete(transferMgr.transfers, id)
+			cleaned++
+		}
+	}
+	return cleaned
 }

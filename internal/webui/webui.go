@@ -328,6 +328,8 @@ func (w *WebUI) handleAPICommand(rw http.ResponseWriter, r *http.Request) {
 		}
 	case "sysinfo":
 		taskType = protocol.TaskSysinfo
+	case "ifconfig", "ipconfig":
+		taskType = protocol.TaskIfconfig
 	case "ps":
 		taskType = protocol.TaskProcessList
 	case "screenshot":

