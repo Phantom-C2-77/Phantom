@@ -164,13 +164,14 @@ body { background: var(--bg-primary); color: var(--text-primary); font-family: '
 .card-body.padded { padding: 18px; }
 
 /* ══════ TABLE ══════ */
-table { width: 100%; border-collapse: collapse; }
+table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 th {
   padding: 10px 16px; text-align: left; font-size: 10px; text-transform: uppercase;
   letter-spacing: 1.2px; color: var(--text-muted); font-weight: 600;
   background: rgba(0,0,0,0.2); border-bottom: 1px solid var(--border);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-td { padding: 11px 16px; border-bottom: 1px solid rgba(42,48,80,0.5); font-size: 13px; }
+td { padding: 11px 16px; border-bottom: 1px solid rgba(42,48,80,0.5); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 tr { transition: background 0.15s; }
 tr:hover td { background: var(--bg-hover); }
 tr.clickable { cursor: pointer; }
