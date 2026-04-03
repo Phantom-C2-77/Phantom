@@ -2689,15 +2689,21 @@ async function loadLoot() {
     }
     const typeIcons = {credentials:'🔑',file:'📄',screenshot:'📸',keylog:'⌨️',sysinfo:'💻',output:'📋'};
     const typeColors = {credentials:'var(--green)',file:'var(--blue)',screenshot:'var(--cyan)',keylog:'var(--yellow)',sysinfo:'var(--accent-light)',output:'var(--text-muted)'};
-    grid.innerHTML = filtered.map(l =>
-      '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden">' +
+    grid.innerHTML = filtered.map(l => {
+      let content;
+      if (l.type === 'screenshot' && l.output.startsWith('data:image/')) {
+        content = '<div style="padding:8px 16px"><img src="'+l.output+'" style="width:100%;border-radius:6px;cursor:pointer" onclick="window.open(this.src)" title="Click to open full size"></div>';
+      } else {
+        content = '<pre style="margin:0;padding:12px 16px;font-size:11px;max-height:200px;overflow-y:auto;background:var(--bg-input);border:none;border-radius:0">'+l.output.substring(0,1000)+'</pre>';
+      }
+      return '<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden">' +
       '<div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">' +
-      '<div><span style="font-size:16px">'+( typeIcons[l.type]||'📋')+'</span> <strong style="color:'+(typeColors[l.type]||'var(--text-primary)')+'">'+l.type.toUpperCase()+'</strong></div>' +
+      '<div><span style="font-size:16px">'+(typeIcons[l.type]||'📋')+'</span> <strong style="color:'+(typeColors[l.type]||'var(--text-primary)')+'">'+l.type.toUpperCase()+'</strong></div>' +
       '<div style="font-size:11px;color:var(--text-muted)">'+l.agent+' · '+l.time+'</div></div>' +
       '<div style="padding:8px 16px;font-size:11px;color:var(--text-secondary);font-family:monospace">'+l.command+'</div>' +
-      '<pre style="margin:0;padding:12px 16px;font-size:11px;max-height:200px;overflow-y:auto;background:var(--bg-input);border:none;border-radius:0">'+l.output.substring(0,1000)+'</pre>' +
-      '<div style="padding:6px 16px;font-size:10px;color:var(--text-muted);border-top:1px solid var(--border)">'+l.size+' bytes</div></div>'
-    ).join('');
+      content +
+      '<div style="padding:6px 16px;font-size:10px;color:var(--text-muted);border-top:1px solid var(--border)">'+l.size+' bytes</div></div>';
+    }).join('');
   } catch(e) { grid.innerHTML = '<div style="color:var(--red);">'+e.message+'</div>'; }
 }
 

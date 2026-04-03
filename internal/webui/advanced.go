@@ -1,6 +1,7 @@
 package webui
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -306,7 +307,11 @@ func (w *WebUI) handleLoot(rw http.ResponseWriter, r *http.Request) {
 			}
 
 			output := string(result.Output)
-			if len(output) > 2000 {
+
+			// For screenshots, base64-encode the PNG data
+			if lootType == "screenshot" && len(result.Output) > 8 {
+				output = "data:image/png;base64," + base64.StdEncoding.EncodeToString(result.Output)
+			} else if len(output) > 2000 {
 				output = output[:2000] + "..."
 			}
 
