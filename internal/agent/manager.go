@@ -1,6 +1,8 @@
 package agent
 
 import (
+	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -34,14 +36,18 @@ func NewManager(database *db.Database, defaultSleep, defaultJitter int) *Manager
 func (m *Manager) Register(req *protocol.RegisterRequest, sessionKey []byte, externalIP, listenerID string) (*db.Agent, error) {
 	agentID := uuid.New().String()
 
-	// Generate unique name
-	name := util.GenerateAgentName()
-	for i := 0; i < 10; i++ {
+	// Use hostname as agent name, add suffix if duplicate
+	name := strings.ToLower(req.Hostname)
+	if name == "" {
+		name = "agent"
+	}
+	baseName := name
+	for i := 1; i <= 20; i++ {
 		existing, _ := m.database.GetAgentByName(name)
 		if existing == nil {
 			break
 		}
-		name = util.GenerateAgentName()
+		name = fmt.Sprintf("%s-%d", baseName, i)
 	}
 
 	now := time.Now()
