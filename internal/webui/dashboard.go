@@ -1401,17 +1401,25 @@ async function refreshAll() {
 
   // Agent selector — only rebuild if agent list actually changed
   const sel = document.getElementById('agent-select');
-  const cur = sel.value || currentTermAgent;
-  const newAgentKey = agents.map(a => a.name + ':' + a.status).join(',');
+  const cur = currentTermAgent || sel.value;
+  const sortedAgents = [...agents].sort((a,b) => a.name.localeCompare(b.name));
+  const newAgentKey = sortedAgents.map(a => a.name).join(',');
   if (newAgentKey !== window._lastAgentKey) {
     window._lastAgentKey = newAgentKey;
-    const opts = agents.map(a => {
+    const opts = sortedAgents.map(a => {
       const status = a.status !== 'active' ? ' ['+a.status+']' : '';
       return '<option value="'+a.name+'" '+(a.name===cur?'selected':'')+'>'+osIcon(a.os)+' '+a.name+' — '+a.hostname+status+'</option>';
     }).join('');
     sel.innerHTML = '<option value="">Select an agent...</option>' + opts;
   }
   if (cur) sel.value = cur;
+  sortedAgents.forEach(a => {
+    const opt = sel.querySelector('option[value="'+a.name+'"]');
+    if (opt) {
+      const status = a.status !== 'active' ? ' ['+a.status+']' : '';
+      opt.textContent = osIcon(a.os)+' '+a.name+' — '+a.hostname+status;
+    }
+  });
 
   // Events
   if (events.length > 0) {
@@ -2880,8 +2888,9 @@ var agentTerminals = {}; // agentName → {html: termBody HTML}
 function updateAgentTabs(agents) {
   var tabs = document.getElementById('agent-tabs');
   if (!tabs) return;
-  var activeAgents = agents.filter(function(a) { return a.status === 'active'; });
-  var currentAgent = document.getElementById('agent-select').value;
+  var activeAgents = agents.filter(function(a) { return a.status === 'active'; })
+    .sort(function(a,b) { return a.name.localeCompare(b.name); });
+  var currentAgent = currentTermAgent || document.getElementById('agent-select').value;
 
   var html = '<span style="color:var(--text-muted);font-size:11px;padding:6px 0;margin-right:6px">SESSIONS:</span>';
   activeAgents.forEach(function(a) {
