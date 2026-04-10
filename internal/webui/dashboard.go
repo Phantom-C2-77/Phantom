@@ -1354,23 +1354,38 @@ async function refreshAll() {
   }
   lastAgentCount = activeAgents;
 
-  // Dashboard agents (card view)
+  // Dashboard agents (card view) — only rebuild when agent list changes
   const wrap = document.getElementById('dash-agents-wrap');
-  if (agents.length > 0) {
-    wrap.innerHTML = '<div class="agent-grid">' + agents.map(a =>
-      '<div class="agent-card" onclick="selectAgent(\''+a.name+'\')">' +
-      '<div class="agent-top"><div><div class="agent-name">'+a.name+' <span onclick="event.stopPropagation();renameAgent(\''+a.name+'\')" style="font-size:10px;cursor:pointer;color:var(--text-muted);margin-left:4px" title="Rename">✏️</span></div>' +
-      '<div class="agent-os">'+osIcon(a.os)+' '+a.os+'</div></div>' +
-      badge(a.status) + '</div>' +
-      '<div class="agent-details">' +
-      '<div class="agent-detail"><div class="agent-detail-label">Host</div><div class="agent-detail-value">'+a.hostname+'</div></div>' +
-      '<div class="agent-detail"><div class="agent-detail-label">User</div><div class="agent-detail-value">'+a.username+'</div></div>' +
-      '<div class="agent-detail"><div class="agent-detail-label">IP</div><div class="agent-detail-value">'+a.ip+'</div></div>' +
-      '<div class="agent-detail"><div class="agent-detail-label">Last Seen</div><div class="agent-detail-value">'+a.last_seen+'</div></div>' +
-      '</div></div>'
-    ).join('') + '</div>';
-  } else {
-    wrap.innerHTML = '<div class="empty"><div class="empty-icon">📡</div><div class="empty-text">Waiting for agents...</div><div class="empty-sub">Deploy an agent to get started</div></div>';
+  const dashKey = agents.map(a => a.name+':'+a.status).join(',');
+  if (dashKey !== window._lastDashKey) {
+    window._lastDashKey = dashKey;
+    if (agents.length > 0) {
+      wrap.innerHTML = '<div class="agent-grid">' + agents.map(a =>
+        '<div class="agent-card" onclick="selectAgent(\''+a.name+'\')">' +
+        '<div class="agent-top"><div><div class="agent-name">'+a.name+' <span onclick="event.stopPropagation();renameAgent(\''+a.name+'\')" style="font-size:10px;cursor:pointer;color:var(--text-muted);margin-left:4px" title="Rename">✏️</span></div>' +
+        '<div class="agent-os">'+osIcon(a.os)+' '+a.os+'</div></div>' +
+        badge(a.status) + '</div>' +
+        '<div class="agent-details">' +
+        '<div class="agent-detail"><div class="agent-detail-label">Host</div><div class="agent-detail-value">'+a.hostname+'</div></div>' +
+        '<div class="agent-detail"><div class="agent-detail-label">User</div><div class="agent-detail-value">'+a.username+'</div></div>' +
+        '<div class="agent-detail"><div class="agent-detail-label">IP</div><div class="agent-detail-value">'+a.ip+'</div></div>' +
+        '<div class="agent-detail"><div class="agent-detail-label">Last Seen</div><div class="agent-detail-value">'+a.last_seen+'</div></div>' +
+        '</div></div>'
+      ).join('') + '</div>';
+    } else {
+      wrap.innerHTML = '<div class="empty"><div class="empty-icon">📡</div><div class="empty-text">Waiting for agents...</div><div class="empty-sub">Deploy an agent to get started</div></div>';
+    }
+  } else if (agents.length > 0) {
+    // Just update Last Seen timestamps without rebuilding
+    agents.forEach(a => {
+      const cards = wrap.querySelectorAll('.agent-card');
+      cards.forEach(card => {
+        if (card.querySelector('.agent-name') && card.querySelector('.agent-name').textContent.trim().startsWith(a.name)) {
+          const details = card.querySelectorAll('.agent-detail-value');
+          if (details.length >= 4) details[3].textContent = a.last_seen;
+        }
+      });
+    });
   }
 
   // All agents table
@@ -2900,22 +2915,30 @@ function updateAgentTabs(agents) {
     .sort(function(a,b) { return a.name.localeCompare(b.name); });
   var currentAgent = currentTermAgent || document.getElementById('agent-select').value;
 
-  var html = '<span style="color:var(--text-muted);font-size:11px;padding:6px 0;margin-right:6px">SESSIONS:</span>';
-  activeAgents.forEach(function(a) {
-    var isActive = a.name === currentAgent;
-    var bgColor = isActive ? 'var(--accent-glow)' : 'var(--bg-input)';
-    var textColor = isActive ? 'var(--accent-light)' : 'var(--text-secondary)';
-    var border = isActive ? '1px solid var(--accent)' : '1px solid var(--border)';
-    var osIcon = a.os === 'windows' ? '🪟' : '🐧';
-    html += '<button onclick="switchAgentTab(\'' + a.name + '\')" style="background:' + bgColor + ';color:' + textColor + ';border:' + border + ';border-radius:6px;padding:4px 12px;cursor:pointer;font-size:11px;display:flex;align-items:center;gap:4px">' +
-      osIcon + ' ' + a.name + ' <span style="font-size:9px;color:var(--text-muted)">(' + a.hostname + ')</span></button>';
-  });
-
-  if (activeAgents.length === 0) {
-    html += '<span style="color:var(--text-muted);font-size:11px;padding:6px">No active agents</span>';
+  // Only rebuild tabs when the agent list actually changes
+  var tabKey = activeAgents.map(function(a) { return a.name; }).join(',');
+  if (tabKey !== window._lastTabKey) {
+    window._lastTabKey = tabKey;
+    var html = '<span style="color:var(--text-muted);font-size:11px;padding:6px 0;margin-right:6px">SESSIONS:</span>';
+    activeAgents.forEach(function(a) {
+      var osIcon = a.os === 'windows' ? '🪟' : (a.os === 'android' ? '📱' : (a.os === 'ios' ? '🍎' : '🐧'));
+      html += '<button data-agent="' + a.name + '" onclick="switchAgentTab(\'' + a.name + '\')" style="border-radius:6px;padding:4px 12px;cursor:pointer;font-size:11px;display:flex;align-items:center;gap:4px">' +
+        osIcon + ' ' + a.name + ' <span style="font-size:9px;color:var(--text-muted)">(' + a.hostname + ')</span></button>';
+    });
+    if (activeAgents.length === 0) {
+      html += '<span style="color:var(--text-muted);font-size:11px;padding:6px">No active agents</span>';
+    }
+    tabs.innerHTML = html;
   }
 
-  tabs.innerHTML = html;
+  // Update active highlight in-place without rebuilding
+  var buttons = tabs.querySelectorAll('button[data-agent]');
+  buttons.forEach(function(btn) {
+    var isActive = btn.getAttribute('data-agent') === currentAgent;
+    btn.style.background = isActive ? 'var(--accent-glow)' : 'var(--bg-input)';
+    btn.style.color = isActive ? 'var(--accent-light)' : 'var(--text-secondary)';
+    btn.style.border = isActive ? '1px solid var(--accent)' : '1px solid var(--border)';
+  });
 }
 
 function switchAgentTab(agentName) {
