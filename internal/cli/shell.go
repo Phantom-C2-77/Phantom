@@ -602,7 +602,20 @@ func (sh *Shell) cmdInteract(args []string) {
 	}
 
 	sh.activeAgent = agent
-	Success("Interacting with %s (%s@%s)", agent.Name, agent.Username, agent.Hostname)
+	osIcon := "🐧"
+	switch agent.OS {
+	case "windows":
+		osIcon = "🪟"
+	case "android":
+		osIcon = "📱"
+	case "ios":
+		osIcon = "🍎"
+	}
+	fmt.Println()
+	fmt.Printf("  %s%s╭─ %s Session: %s ─╮%s\n", colorBold, colorGreen, osIcon, agent.Name, colorReset)
+	fmt.Printf("  %s%s│%s  %s@%s (%s/%s)%s\n", colorBold, colorGreen, colorReset, agent.Username, agent.Hostname, agent.OS, agent.Arch, colorReset)
+	fmt.Printf("  %s%s│%s  IP: %s%s%s  Sleep: %ds/%d%%%s\n", colorBold, colorGreen, colorReset, colorCyan, agent.ExternalIP, colorReset, agent.Sleep, agent.Jitter, colorReset)
+	fmt.Printf("  %s%s╰─ Type 'help' for commands ─╯%s\n", colorBold, colorGreen, colorReset)
 }
 
 func (sh *Shell) cmdListeners(args []string) {
@@ -1192,71 +1205,167 @@ func (sh *Shell) cmdEvents() {
 // ─────────────── Agent Commands ───────────────
 
 func (sh *Shell) cmdAgentHelp() {
+	name := sh.activeAgent.Name
+	os := sh.activeAgent.OS
+
 	fmt.Println()
-	fmt.Printf("  %s%sAgent Commands — %s%s\n", colorBold, colorCyan, sh.activeAgent.Name, colorReset)
-	fmt.Printf("  %s─────────────────────────────────────────%s\n", colorDim, colorReset)
+	fmt.Printf("  %s%s╔══════════════════════════════════════════════════════════╗%s\n", colorBold, colorCyan, colorReset)
+	fmt.Printf("  %s%s║        ⚔️  AGENT COMMANDS — %-25s  ║%s\n", colorBold, colorCyan, name, colorReset)
+	fmt.Printf("  %s%s╚══════════════════════════════════════════════════════════╝%s\n", colorBold, colorCyan, colorReset)
 	fmt.Println()
 
-	cmds := [][]string{
-		{"shell <command>", "Execute a shell command"},
-		{"upload <local> <remote>", "Upload file to agent"},
-		{"download <remote>", "Download file from agent"},
-		{"screenshot", "Capture screenshot"},
-		{"ps", "List running processes"},
-		{"sysinfo", "Get system information"},
-		{"ifconfig", "Show network interfaces (alias: ipconfig)"},
-		{"persist <method>", "Install persistence (12 methods — type 'persist' for list)"},
-		{"sleep <sec> [jitter%]", "Change sleep interval"},
-		{"cd <path>", "Change working directory"},
-		{"", ""},
-		{"assembly <path> [args]", "Execute .NET assembly (Seatbelt, Rubeus, etc.)"},
-		{"lateral <method> <args>", "Lateral movement (wmiexec|winrm|psexec|ssh|pth)"},
-		{"exfil <method> <args>", "Data exfiltration (dns|http|icmp|smb|clipboard|browser)"},
-		{"initaccess <cmd> <args>", "Initial access (portscan|spray|enum-smb|vuln-scan)"},
-		{"", ""},
-		{"bof <file> [args]", "Execute Beacon Object File (in-memory)"},
-		{"shellcode <file>", "Execute raw shellcode in-memory"},
-		{"inject <pid> <file>", "Inject shellcode into remote process"},
-		{"hollow <exe> <file>", "Process hollowing (spawn + inject)"},
-		{"evasion [advanced]", "Evasion (AMSI/ETW/unhook/removepe/blockdlls)"},
-		{"", ""},
-		{"pivot <start|stop|list>", "SMB/Unix socket pivot relay"},
+	sections := []struct {
+		title string
+		icon  string
+		cmds  [][]string
+	}{
+		{"Recon & Info", "🔍", [][]string{
+			{"shell <command>", "Execute a shell command"},
+			{"sysinfo", "System / device information"},
+			{"ps", "List running processes"},
+			{"ifconfig", "Network interfaces"},
+			{"cd <path>", "Change directory"},
+			{"info", "Show agent details"},
+			{"tasks", "Task history for this agent"},
+		}},
+		{"File Operations", "📁", [][]string{
+			{"upload <local> <remote>", "Upload file to agent"},
+			{"download <path>", "Download file from agent"},
+			{"screenshot", "Capture screen"},
+		}},
+	}
+
+	// Mobile-specific commands
+	if os == "android" || os == "ios" {
+		sections = append(sections, struct {
+			title string
+			icon  string
+			cmds  [][]string
+		}{"Mobile", "📱", [][]string{
+			{"location", "GPS / cell location"},
+			{"clipboard", "Clipboard contents"},
+			{"fileget <path>", "Base64 file download"},
+		}})
+	}
+
+	// Windows/Linux commands
+	if os == "windows" || os == "linux" {
+		sections = append(sections, struct {
+			title string
+			icon  string
+			cmds  [][]string
+		}{"Execution", "💉", [][]string{
+			{"assembly <path> [args]", ".NET assembly (Seatbelt, Rubeus)"},
+			{"bof <file> [args]", "Beacon Object File (in-memory)"},
+			{"shellcode <file>", "Raw shellcode injection"},
+			{"inject <pid> <file>", "Remote process injection"},
+			{"hollow <exe> <file>", "Process hollowing"},
+		}})
+	}
+
+	sections = append(sections, struct {
+		title string
+		icon  string
+		cmds  [][]string
+	}{"Credential Access", "🔑", [][]string{
+		{"creds <all|browser|wifi>", "Harvest credentials"},
 		{"token <steal|make|revert>", "Token manipulation (Windows)"},
-		{"keylog [seconds]", "Capture keystrokes (default: 30s)"},
-		{"socks <start|stop> [port]", "C2-tunneled SOCKS5 proxy (proxychains)"},
-		{"portfwd <local> <remote>", "TCP port forwarding"},
-		{"creds <browser|wifi|ssh|all>", "Credential harvesting"},
-		{"ad-*", "Active Directory commands (type 'ad-help')"},
-		{"", ""},
-		{"kill", "Terminate the agent"},
-		{"info", "Show agent details"},
-		{"tasks", "Show task history for this agent"},
-		{"back", "Return to main menu"},
+		{"keylog [seconds]", "Keylogger (default: 30s)"},
+	}})
+
+	if os == "windows" || os == "linux" {
+		sections = append(sections, struct {
+			title string
+			icon  string
+			cmds  [][]string
+		}{"Lateral & Pivoting", "🔀", [][]string{
+			{"lateral wmiexec <ip> ...", "WMI execution"},
+			{"lateral winrm <ip> ...", "WinRM execution"},
+			{"socks <start|stop|list>", "SOCKS5 proxy"},
+			{"portfwd <local> <remote>", "TCP port forward"},
+			{"pivot <start|stop|list>", "SMB/socket relay"},
+		}})
+
+		sections = append(sections, struct {
+			title string
+			icon  string
+			cmds  [][]string
+		}{"Evasion & Persistence", "🛡️", [][]string{
+			{"evasion", "AMSI/ETW bypass + ntdll unhook"},
+			{"persist <method>", "Install persistence (12 methods)"},
+			{"sleep <sec> [jitter%]", "Change beacon interval"},
+		}})
+
+		sections = append(sections, struct {
+			title string
+			icon  string
+			cmds  [][]string
+		}{"Active Directory", "🏰", [][]string{
+			{"ad-enum-users", "Enumerate domain users"},
+			{"ad-enum-groups", "Enumerate domain groups"},
+			{"ad-enum-computers", "Enumerate domain computers"},
+			{"ad-enum-spns", "Find SPNs (Kerberoast)"},
+			{"ad-help", "Full AD command reference"},
+		}})
 	}
 
-	for _, c := range cmds {
-		fmt.Printf("  %s%-28s%s %s%s%s\n", colorCyan, c[0], colorReset, colorDim, c[1], colorReset)
+	sections = append(sections, struct {
+		title string
+		icon  string
+		cmds  [][]string
+	}{"Session", "⚙️", [][]string{
+		{"back", "Return to main menu"},
+		{"kill", "Terminate the agent"},
+	}})
+
+	for _, s := range sections {
+		fmt.Printf("  %s%s %s %s%s\n", colorBold+colorYellow, s.icon, s.title, colorReset, "")
+		for _, c := range s.cmds {
+			fmt.Printf("    %s%-28s%s %s%s%s\n", colorCyan, c[0], colorReset, colorDim, c[1], colorReset)
+		}
+		fmt.Println()
 	}
-	fmt.Println()
 }
 
 func (sh *Shell) cmdAgentInfo() {
 	a := sh.activeAgent
+
+	osIcon := "🐧"
+	switch a.OS {
+	case "windows":
+		osIcon = "🪟"
+	case "android":
+		osIcon = "📱"
+	case "ios":
+		osIcon = "🍎"
+	}
+
+	statusColor := colorGreen
+	statusDot := "●"
+	if a.Status == "dormant" {
+		statusColor = colorYellow
+		statusDot = "◐"
+	} else if a.Status == "dead" {
+		statusColor = colorRed
+		statusDot = "○"
+	}
+
 	fmt.Println()
-	fmt.Printf("  %s%sAgent: %s%s\n", colorBold, colorCyan, a.Name, colorReset)
-	fmt.Printf("  %s─────────────────────────────────────────%s\n", colorDim, colorReset)
-	fmt.Printf("  %-15s %s\n", "ID:", a.ID)
-	fmt.Printf("  %-15s %s\n", "Name:", a.Name)
-	fmt.Printf("  %-15s %s\n", "Hostname:", a.Hostname)
-	fmt.Printf("  %-15s %s\n", "Username:", a.Username)
-	fmt.Printf("  %-15s %s / %s\n", "OS/Arch:", a.OS, a.Arch)
-	fmt.Printf("  %-15s %d (%s)\n", "PID:", a.PID, a.ProcessName)
-	fmt.Printf("  %-15s %s\n", "Internal IP:", a.InternalIP)
-	fmt.Printf("  %-15s %s\n", "External IP:", a.ExternalIP)
-	fmt.Printf("  %-15s %ds / %d%% jitter\n", "Sleep:", a.Sleep, a.Jitter)
-	fmt.Printf("  %-15s %s\n", "First Seen:", util.FormatTimestamp(a.FirstSeen))
-	fmt.Printf("  %-15s %s (%s)\n", "Last Seen:", util.FormatTimestamp(a.LastSeen), util.TimeAgo(a.LastSeen))
-	fmt.Printf("  %-15s %s\n", "Status:", a.Status)
+	fmt.Printf("  %s%s╔══════════════════════════════════════════╗%s\n", colorBold, colorCyan, colorReset)
+	fmt.Printf("  %s%s║  %s  %-36s  ║%s\n", colorBold, colorCyan, osIcon, a.Name, colorReset)
+	fmt.Printf("  %s%s╚══════════════════════════════════════════╝%s\n", colorBold, colorCyan, colorReset)
+	fmt.Println()
+	fmt.Printf("  %s%s  ID%s          %s%s%s\n", colorBold, colorDim, colorReset, colorPurple, a.ID, colorReset)
+	fmt.Printf("  %s%s  Hostname%s    %s%s%s\n", colorBold, colorDim, colorReset, colorWhite, a.Hostname, colorReset)
+	fmt.Printf("  %s%s  Username%s    %s%s%s\n", colorBold, colorDim, colorReset, colorWhite, a.Username, colorReset)
+	fmt.Printf("  %s%s  OS / Arch%s   %s%s / %s%s\n", colorBold, colorDim, colorReset, colorCyan, a.OS, a.Arch, colorReset)
+	fmt.Printf("  %s%s  Process%s     %s%s%s (PID %d)\n", colorBold, colorDim, colorReset, colorWhite, a.ProcessName, colorReset, a.PID)
+	fmt.Printf("  %s%s  Internal%s    %s%s%s\n", colorBold, colorDim, colorReset, colorCyan, a.InternalIP, colorReset)
+	fmt.Printf("  %s%s  External%s    %s%s%s\n", colorBold, colorDim, colorReset, colorCyan, a.ExternalIP, colorReset)
+	fmt.Printf("  %s%s  Sleep%s       %s%ds%s / %s%d%%%s jitter\n", colorBold, colorDim, colorReset, colorYellow, a.Sleep, colorReset, colorYellow, a.Jitter, colorReset)
+	fmt.Printf("  %s%s  First Seen%s  %s%s%s\n", colorBold, colorDim, colorReset, colorDim, util.FormatTimestamp(a.FirstSeen), colorReset)
+	fmt.Printf("  %s%s  Last Seen%s   %s%s%s (%s)\n", colorBold, colorDim, colorReset, colorWhite, util.FormatTimestamp(a.LastSeen), colorReset, util.TimeAgo(a.LastSeen))
+	fmt.Printf("  %s%s  Status%s      %s%s %s%s\n", colorBold, colorDim, colorReset, statusColor, statusDot, a.Status, colorReset)
 	fmt.Println()
 }
 
