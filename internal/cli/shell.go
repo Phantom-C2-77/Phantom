@@ -474,34 +474,80 @@ func (sh *Shell) executeAgentCmd(cmd string, args []string) {
 
 func (sh *Shell) cmdHelp() {
 	fmt.Println()
-	fmt.Printf("  %s%sPhantom C2 — Commands%s\n", colorBold, colorPurple, colorReset)
-	fmt.Printf("  %s─────────────────────────────────────────%s\n", colorDim, colorReset)
+	fmt.Printf("  %s%s╔══════════════════════════════════════════════════════════╗%s\n", colorBold, colorPurple, colorReset)
+	fmt.Printf("  %s%s║             ⚡  PHANTOM C2 — COMMAND REFERENCE           ║%s\n", colorBold, colorPurple, colorReset)
+	fmt.Printf("  %s%s╚══════════════════════════════════════════════════════════╝%s\n", colorBold, colorPurple, colorReset)
 	fmt.Println()
 
-	cmds := [][]string{
-		{"agents", "List all connected agents"},
-		{"interact <name|id>", "Interact with an agent"},
-		{"listeners [start|stop] <name>", "Manage listeners"},
-		{"tasks [agent]", "View task history"},
-		{"generate <type> [url]", "Build agent or generate payload"},
-		{"remove <name|id>", "Remove a dead agent"},
-		{"loot [agent]", "View captured loot"},
-		{"report [md|csv|all]", "Generate engagement report"},
-		{"webui [addr]", "Start web dashboard (default: 127.0.0.1:3000)"},
-		{"webhook <slack|discord> <url>", "Set webhook notifications"},
-		{"redirector <domain> <c2_ip>", "Generate redirector configs"},
-		{"doctor", "Run diagnostics / troubleshooting"},
-		{"version", "Show version info"},
-		{"events", "View event log"},
-		{"clear", "Clear screen"},
-		{"help", "Show this help"},
-		{"exit", "Shutdown and exit"},
+	sections := []struct {
+		title string
+		icon  string
+		cmds  [][]string
+	}{
+		{"Core", "🔧", [][]string{
+			{"agents", "List all connected agents"},
+			{"interact <name>", "Interact with an agent"},
+			{"back", "Deselect current agent"},
+			{"remove <name>", "Remove a dead agent"},
+			{"clear", "Clear screen"},
+			{"exit", "Shutdown and exit"},
+		}},
+		{"Infrastructure", "🌐", [][]string{
+			{"listeners [start|stop]", "Manage C2 listeners"},
+			{"webui [addr]", "Start web dashboard"},
+			{"webhook <type> <url>", "Set Slack/Discord notifications"},
+			{"redirector <domain> <ip>", "Generate redirector configs"},
+		}},
+		{"Payloads", "📦", [][]string{
+			{"generate exe [url]", "Windows agent (.exe)"},
+			{"generate elf [url]", "Linux agent (ELF)"},
+			{"generate android [url]", "Android APK with C2 callback"},
+			{"generate ios [url]", "iOS phishing + MDM profile"},
+			{"generate app <template>", "Fake mobile app (30+ templates)"},
+			{"generate <php|aspx|jsp>", "Web shells"},
+			{"generate <ps|bash|python>", "Stagers"},
+		}},
+		{"Post-Exploitation", "⚔️", [][]string{
+			{"shell <cmd>", "Execute shell command"},
+			{"sysinfo", "Device/system information"},
+			{"ps", "Process list"},
+			{"cd <path>", "Change directory"},
+			{"download <path>", "Download file from target"},
+			{"upload <local> <remote>", "Upload file to target"},
+			{"screenshot", "Capture screen"},
+			{"location", "GPS / cell location (mobile)"},
+			{"clipboard", "Clipboard contents (mobile)"},
+			{"fileget <path>", "Base64 file download (mobile)"},
+		}},
+		{"Credential Access", "🔑", [][]string{
+			{"creds [all|mimikatz|sam]", "Harvest credentials"},
+			{"token [steal|info|revert]", "Token manipulation"},
+			{"keylog [seconds]", "Keylogger"},
+		}},
+		{"Lateral Movement", "🔀", [][]string{
+			{"lateral wmiexec <ip> ...", "WMI execution"},
+			{"lateral winrm <ip> ...", "WinRM execution"},
+			{"lateral psexec <ip> ...", "PsExec execution"},
+			{"socks [start|stop|list]", "SOCKS5 proxy"},
+			{"portfwd <local> <remote>", "TCP port forwarding"},
+		}},
+		{"Intel & Reporting", "📊", [][]string{
+			{"tasks [agent]", "View task history"},
+			{"loot [agent]", "View captured loot"},
+			{"events", "View event log"},
+			{"report [md|csv|all]", "Generate engagement report"},
+			{"doctor", "Run diagnostics"},
+			{"version", "Version info"},
+		}},
 	}
 
-	for _, c := range cmds {
-		fmt.Printf("  %s%-30s%s %s%s%s\n", colorCyan, c[0], colorReset, colorDim, c[1], colorReset)
+	for _, s := range sections {
+		fmt.Printf("  %s%s %s %s%s\n", colorBold+colorYellow, s.icon, s.title, colorReset, "")
+		for _, c := range s.cmds {
+			fmt.Printf("    %s%-28s%s %s%s%s\n", colorCyan, c[0], colorReset, colorDim, c[1], colorReset)
+		}
+		fmt.Println()
 	}
-	fmt.Println()
 }
 
 func (sh *Shell) cmdAgents() {
@@ -521,6 +567,7 @@ func (sh *Shell) cmdAgents() {
 	agents, _ = sh.server.AgentMgr.List()
 
 	t := NewTable("ID", "Name", "OS", "Hostname", "User", "IP", "Sleep", "Last Seen", "Status")
+	t.Title = fmt.Sprintf("⚡ AGENTS (%d connected)", len(agents))
 	for _, a := range agents {
 		t.AddRow(
 			util.ShortID(a.ID),
@@ -568,6 +615,7 @@ func (sh *Shell) cmdListeners(args []string) {
 		}
 
 		t := NewTable("Name", "Type", "Bind Address", "Status")
+		t.Title = "🌐 LISTENERS"
 		for _, l := range listeners {
 			status := "stopped"
 			if l.IsRunning() {
@@ -730,6 +778,7 @@ func (sh *Shell) cmdTasks(args []string) {
 	}
 
 	t := NewTable("ID", "Agent", "Type", "Args", "Status", "Created")
+	t.Title = "📋 TASKS"
 	for _, task := range allTasks {
 		agentName := util.ShortID(task.AgentID)
 		a, _ := sh.server.AgentMgr.Get(task.AgentID)
@@ -971,6 +1020,7 @@ func (sh *Shell) cmdLoot(args []string) {
 	}
 
 	t := NewTable("ID", "Agent", "Type", "Name", "Created")
+	t.Title = "💎 LOOT"
 	for _, l := range loot {
 		agentName := util.ShortID(l.AgentID)
 		a, _ := sh.server.AgentMgr.Get(l.AgentID)
