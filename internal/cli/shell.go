@@ -1027,8 +1027,16 @@ func (sh *Shell) cmdRemoveAgent(args []string) {
 		return
 	}
 
-	answer, err := sh.liner.Prompt(fmt.Sprintf("  [!] Remove agent '%s' (%s@%s)? (y/N): ", a.Name, a.Username, a.Hostname))
-	if err == nil && strings.ToLower(strings.TrimSpace(answer)) == "y" {
+	// Confirm — handle both liner mode and basic mode
+	confirmMsg := fmt.Sprintf("  %s[!]%s Remove agent '%s' (%s@%s)? (y/N): ", colorYellow, colorReset, a.Name, a.Username, a.Hostname)
+	var answer string
+	if sh.liner != nil {
+		answer, _ = sh.liner.Prompt(confirmMsg)
+	} else {
+		fmt.Print(confirmMsg)
+		fmt.Scanln(&answer)
+	}
+	if strings.ToLower(strings.TrimSpace(answer)) == "y" {
 		if err := sh.server.AgentMgr.Remove(a.ID); err != nil {
 			Error("Failed to remove: %v", err)
 			return
