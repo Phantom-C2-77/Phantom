@@ -506,7 +506,6 @@ tr.clickable { cursor: pointer; }
                 <option value="https">HTTPS</option>
                 <option value="tcp">TCP (Raw)</option>
                 <option value="dns">DNS</option>
-                <option value="smb">SMB (Named Pipe)</option>
               </select>
             </div>
             <div>

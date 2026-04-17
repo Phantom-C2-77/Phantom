@@ -129,7 +129,12 @@ func (s *Server) StopListener(name string) error {
 }
 
 // CreateListener creates and registers a new listener at runtime.
+// Supported types: http, https, dns, tcp. SMB is agent-side only (use 'pivot start' on an agent).
 func (s *Server) CreateListener(name, typ, bind, profile, tlsCert, tlsKey string) error {
+	if typ == "smb" {
+		return fmt.Errorf("SMB is not a server-side listener — deploy an agent then run: pivot start [pipe-name]")
+	}
+
 	profilePath := filepath.Join("configs", "profiles", profile+".yaml")
 	prof, err := listener.LoadProfile(profilePath)
 	if err != nil {

