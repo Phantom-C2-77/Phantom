@@ -6,7 +6,7 @@ AGENT_DIR   := $(BUILD_DIR)/agents
 VERSION     := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 LDFLAGS     := -s -w -X '$(MODULE)/internal/implant.Version=$(VERSION)'
 
-LISTENER_URL ?= https://127.0.0.1:443
+LISTENER_URL ?= https://127.0.0.1:443 # comma-separated for failover, e.g.: https://primary:443,https://backup:443
 SLEEP        ?= 10
 JITTER       ?= 20
 SERVER_PUBKEY := $(shell openssl rsa -pubin -in configs/server.pub -outform DER 2>/dev/null | base64 -w0)
