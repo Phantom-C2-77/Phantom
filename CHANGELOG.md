@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Web UI help command
+
+- `help` / `?` in the Web UI terminal now returns the same agent command
+  reference the CLI already shows (`cmdAgentHelp` in `internal/cli/shell.go`).
+  Previously, typing `help` in the browser terminal fell through to the default
+  branch and was sent to the target as a shell command.
+- Server-side: `/api/cmd` intercepts `help` / `?` before task dispatch and
+  returns `{inline: true, output: <reference>}` built by `buildAgentHelpText`
+  in `internal/webui/webui.go`. The output is OS-aware (Mobile sections for
+  Android/iOS; Execution, Lateral, Evasion, Active Directory for Windows/Linux).
+- Client-side: the terminal input recognizes `help` and `?`, and inline
+  responses are rendered directly without the task-poll loop.
+
 ## [1.0.2] — 2026-03-28
 
 ### 🔒 Web UI Auth, Payload Generator, Multi-Operator

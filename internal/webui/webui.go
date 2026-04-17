@@ -318,6 +318,16 @@ func (w *WebUI) handleAPICommand(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Inline commands (handled server-side without queuing a task).
+	switch strings.ToLower(req.Command) {
+	case "help", "?":
+		writeJSON(rw, map[string]interface{}{
+			"inline": true,
+			"output": buildAgentHelpText(agent.Name, agent.OS),
+		})
+		return
+	}
+
 	// Parse command and queue task
 	var taskType uint8
 	var args []string
@@ -453,4 +463,97 @@ func writeJSON(rw http.ResponseWriter, data interface{}) {
 	rw.Header().Set("Content-Type", "application/json")
 	rw.Header().Set("Access-Control-Allow-Origin", "*")
 	json.NewEncoder(rw).Encode(data)
+}
+
+// buildAgentHelpText returns a plain-text command reference for the given
+// agent, mirroring the CLI's cmdAgentHelp. OS-specific sections are included
+// only when they apply (e.g. AD/Execution on windows/linux, Mobile on
+// android/ios), so the operator sees exactly what they can run on the target.
+func buildAgentHelpText(name, os string) string {
+	var b strings.Builder
+
+	title := fmt.Sprintf("AGENT COMMANDS — %s", name)
+	b.WriteString("\n")
+	b.WriteString("═══════════════════════════════════════════════════════════\n")
+	b.WriteString("  " + title + "\n")
+	b.WriteString("═══════════════════════════════════════════════════════════\n\n")
+
+	writeSection := func(header string, rows [][2]string) {
+		b.WriteString(" " + header + "\n")
+		for _, r := range rows {
+			b.WriteString(fmt.Sprintf("    %-30s  %s\n", r[0], r[1]))
+		}
+		b.WriteString("\n")
+	}
+
+	writeSection("Recon & Info", [][2]string{
+		{"shell <command>", "Execute a shell command"},
+		{"sysinfo", "System / device information"},
+		{"ps", "List running processes"},
+		{"ifconfig", "Network interfaces"},
+		{"cd <path>", "Change directory"},
+		{"info", "Show agent details"},
+		{"tasks", "Task history for this agent"},
+	})
+
+	writeSection("File Operations", [][2]string{
+		{"upload <local> <remote>", "Upload file to agent"},
+		{"download <path>", "Download file from agent"},
+		{"screenshot", "Capture screen"},
+	})
+
+	if os == "android" || os == "ios" {
+		writeSection("Mobile", [][2]string{
+			{"location", "GPS / cell location"},
+			{"clipboard", "Clipboard contents"},
+			{"fileget <path>", "Base64 file download"},
+		})
+	}
+
+	if os == "windows" || os == "linux" {
+		writeSection("Execution", [][2]string{
+			{"assembly <path> [args]", ".NET assembly (Seatbelt, Rubeus)"},
+			{"bof <file> [args]", "Beacon Object File (in-memory)"},
+			{"shellcode <file>", "Raw shellcode injection"},
+			{"inject <pid> <file>", "Remote process injection"},
+			{"hollow <exe> <file>", "Process hollowing"},
+		})
+	}
+
+	writeSection("Credential Access", [][2]string{
+		{"creds <all|browser|wifi>", "Harvest credentials"},
+		{"token <steal|make|revert>", "Token manipulation (Windows)"},
+		{"keylog [seconds]", "Keylogger (default: 30s)"},
+	})
+
+	if os == "windows" || os == "linux" {
+		writeSection("Lateral & Pivoting", [][2]string{
+			{"lateral wmiexec <ip> ...", "WMI execution"},
+			{"lateral winrm <ip> ...", "WinRM execution"},
+			{"socks <start|stop|list>", "SOCKS5 proxy"},
+			{"portfwd <local> <remote>", "TCP port forward"},
+			{"pivot <start|stop|list>", "SMB/socket relay"},
+		})
+
+		writeSection("Evasion & Persistence", [][2]string{
+			{"evasion", "AMSI/ETW bypass + ntdll unhook"},
+			{"persist <method>", "Install persistence (12 methods)"},
+			{"sleep <sec> [jitter%]", "Change beacon interval"},
+		})
+
+		writeSection("Active Directory", [][2]string{
+			{"ad-enum-users", "Enumerate domain users"},
+			{"ad-enum-groups", "Enumerate domain groups"},
+			{"ad-enum-computers", "Enumerate domain computers"},
+			{"ad-enum-spns", "Find SPNs (Kerberoast)"},
+			{"ad-help", "Full AD command reference"},
+		})
+	}
+
+	writeSection("Session", [][2]string{
+		{"back", "Return to main menu"},
+		{"kill", "Terminate the agent"},
+	})
+
+	return b.String()
 }

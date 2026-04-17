@@ -173,7 +173,7 @@
 - **Dashboard** — real-time stats, beacon graphs, network topology, engagement timer
 - **Agent management** — rename agents, delete dead agents, agent cards with status
 - **Listener management** — create, start/stop, save presets, one-click launch
-- **Interactive terminal** — colored output (IPs cyan, errors red, FLAGs gold), command history
+- **Interactive terminal** — colored output (IPs cyan, errors red, FLAGs gold), command history, `help` / `?` for full agent command reference (OS-aware)
 - **Payload generator** — listener/preset dropdown, obfuscation level, auto-download
 - **Backdoor generator** — binary backdoor + 10 persistence types from browser
 - **File browser** — OS-adaptive (dir/ls), clickable folders, Up/Refresh navigation
