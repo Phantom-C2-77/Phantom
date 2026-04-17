@@ -777,7 +777,6 @@ tr.clickable { cursor: pointer; }
                     <option value="dll">📦 Windows DLL (rundll32 / regsvr32)</option>
                     <option value="elf">🐧 Linux ELF (amd64)</option>
                     <option value="elf-garble">🐧 Linux ELF (Obfuscated)</option>
-                    <option value="darwin">🍎 macOS (darwin/amd64)</option>
                   </optgroup>
                   <optgroup label="Web Shells">
                     <option value="aspx">🌐 ASPX Web Shell (IIS)</option>
