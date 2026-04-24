@@ -113,3 +113,37 @@ func (db *Database) DeleteAgent(id string) error {
 	_, err := db.conn.Exec(`DELETE FROM agents WHERE id = ?`, id)
 	return err
 }
+
+// ──── Payload History ────
+
+// InsertPayloadRecord persists a payload generation record.
+func (db *Database) InsertPayloadRecord(id, ptype, filename, fpath, size, listener, createdAt string) error {
+	_, err := db.conn.Exec(
+		`INSERT OR REPLACE INTO payload_history (id, type, filename, filepath, size, listener, created_at) VALUES (?,?,?,?,?,?,?)`,
+		id, ptype, filename, fpath, size, listener, createdAt,
+	)
+	return err
+}
+
+// ListPayloadHistory returns all payload records ordered by creation time.
+func (db *Database) ListPayloadHistory() ([]map[string]string, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, type, filename, filepath, size, listener, created_at FROM payload_history ORDER BY created_at ASC`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []map[string]string
+	for rows.Next() {
+		var id, ptype, filename, fpath, size, listener, createdAt string
+		if err := rows.Scan(&id, &ptype, &filename, &fpath, &size, &listener, &createdAt); err != nil {
+			continue
+		}
+		result = append(result, map[string]string{
+			"id": id, "type": ptype, "filename": filename,
+			"filepath": fpath, "size": size, "listener": listener, "created_at": createdAt,
+		})
+	}
+	return result, rows.Err()
+}

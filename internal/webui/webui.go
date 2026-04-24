@@ -23,7 +23,12 @@ type WebUI struct {
 
 // New creates a new WebUI instance.
 func New(srv *server.Server, bindAddr string) *WebUI {
-	return &WebUI{server: srv, bindAddr: bindAddr, auth: NewWebAuth()}
+	w := &WebUI{server: srv, bindAddr: bindAddr, auth: NewWebAuth()}
+	// Wire DB to payload history so records survive server restarts
+	if srv.DB != nil {
+		payloadDB = srv.DB
+	}
+	return w
 }
 
 // Start launches the web UI HTTP server.

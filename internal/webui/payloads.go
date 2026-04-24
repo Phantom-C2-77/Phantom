@@ -582,6 +582,12 @@ func (w *WebUI) handleBinaryBackdoor(rw http.ResponseWriter, r *http.Request) {
 		size = fmt.Sprintf("%.2f MB", float64(info.Size())/(1024*1024))
 	}
 
+	ptype := "backdoor-exe"
+	if req.Obfuscate {
+		ptype = "backdoor-exe-garbled"
+	}
+	AddPayloadRecord(ptype, filepath.Base(outPath), outPath, size, req.ListenerURL)
+
 	writeJSON(rw, map[string]interface{}{
 		"success":  true,
 		"message":  fmt.Sprintf("Binary backdoored: %s", outPath),

@@ -226,6 +226,10 @@ func (w *WebUI) handleTransfers(rw http.ResponseWriter, r *http.Request) {
 var (
 	payloadHistory   []PayloadRecord
 	payloadHistoryMu sync.Mutex
+	payloadDB        interface {
+		InsertPayloadRecord(id, ptype, filename, fpath, size, listener, createdAt string) error
+		ListPayloadHistory() ([]map[string]string, error)
+	}
 )
 
 type PayloadRecord struct {
@@ -239,17 +243,46 @@ type PayloadRecord struct {
 	Exists    bool   `json:"exists"` // whether the file still exists on disk
 }
 
-func AddPayloadRecord(ptype, filename, filepath, size, listener string) {
+func AddPayloadRecord(ptype, filename, fpath, size, listener string) {
 	payloadHistoryMu.Lock()
 	defer payloadHistoryMu.Unlock()
-	id := fmt.Sprintf("pl-%d", len(payloadHistory)+1)
-	payloadHistory = append(payloadHistory, PayloadRecord{
-		ID: id, Type: ptype, Filename: filename, FilePath: filepath,
+	id := fmt.Sprintf("pl-%d", time.Now().UnixNano())
+	rec := PayloadRecord{
+		ID: id, Type: ptype, Filename: filename, FilePath: fpath,
 		Size: size, Listener: listener, CreatedAt: time.Now().Format("2006-01-02 15:04:05"),
-	})
+	}
+	payloadHistory = append(payloadHistory, rec)
+	// Persist to DB if available
+	if payloadDB != nil {
+		payloadDB.InsertPayloadRecord(id, ptype, filename, fpath, size, listener, rec.CreatedAt)
+	}
 }
 
 func (w *WebUI) handlePayloadHistory(rw http.ResponseWriter, r *http.Request) {
+	// Load from DB on every request — authoritative and survives restarts
+	if w.server.DB != nil {
+		rows, err := w.server.DB.ListPayloadHistory()
+		if err == nil {
+			result := make([]PayloadRecord, 0, len(rows))
+			for _, row := range rows {
+				_, statErr := os.Stat(row["filepath"])
+				result = append(result, PayloadRecord{
+					ID:        row["id"],
+					Type:      row["type"],
+					Filename:  row["filename"],
+					FilePath:  row["filepath"],
+					Size:      row["size"],
+					Listener:  row["listener"],
+					CreatedAt: row["created_at"],
+					Exists:    statErr == nil,
+				})
+			}
+			writeJSON(rw, result)
+			return
+		}
+	}
+
+	// Fallback: in-memory
 	payloadHistoryMu.Lock()
 	defer payloadHistoryMu.Unlock()
 	if payloadHistory == nil {

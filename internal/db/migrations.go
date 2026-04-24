@@ -94,6 +94,16 @@ func (db *Database) migrate() error {
 		`CREATE INDEX IF NOT EXISTS idx_loot_agent ON loot(agent_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_task_results_agent ON task_results(agent_id)`,
 
+		`CREATE TABLE IF NOT EXISTS payload_history (
+			id         TEXT PRIMARY KEY,
+			type       TEXT NOT NULL DEFAULT '',
+			filename   TEXT NOT NULL DEFAULT '',
+			filepath   TEXT NOT NULL DEFAULT '',
+			size       TEXT NOT NULL DEFAULT '',
+			listener   TEXT NOT NULL DEFAULT '',
+			created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)`,
+
 		// v2 migrations — safe to re-run (ALTER TABLE is idempotent via IGNORE)
 		`ALTER TABLE agents ADD COLUMN tags TEXT NOT NULL DEFAULT ''`,
 	}
