@@ -178,26 +178,27 @@ func (l *HTTPListener) handleRegister(w http.ResponseWriter, r *http.Request) {
 	// Unwrap HTTP JSON wrapper
 	env, err := protocol.UnwrapFromHTTP(body)
 	if err != nil {
+		_ = err // decoy served
 		l.serveDecoy(w, r)
 		return
 	}
 
 	if env.Type != protocol.MsgRegisterRequest {
-		l.serveDecoy(w, r)
+			l.serveDecoy(w, r)
 		return
 	}
 
 	// RSA decrypt to get session key + registration payload
 	sessionKey, regPayload, err := crypto.UnpackKeyExchange(l.privKey, env.Payload)
 	if err != nil {
-		l.serveDecoy(w, r)
+			l.serveDecoy(w, r)
 		return
 	}
 
 	// Deserialize registration request
 	var regReq protocol.RegisterRequest
 	if err := protocol.Unmarshal(regPayload, &regReq); err != nil {
-		l.serveDecoy(w, r)
+			l.serveDecoy(w, r)
 		return
 	}
 
@@ -207,7 +208,7 @@ func (l *HTTPListener) handleRegister(w http.ResponseWriter, r *http.Request) {
 	// Register the agent
 	agentRecord, err := l.agentMgr.Register(&regReq, sessionKey, externalIP, l.ID)
 	if err != nil {
-		l.serveDecoy(w, r)
+			l.serveDecoy(w, r)
 		return
 	}
 
