@@ -901,48 +901,70 @@ tr.clickable { cursor: pointer; }
 
       <!-- Backdoor Generator -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px">
-        <div class="card">
-          <div class="card-header"><h3><span>💉</span> Binary Backdoor</h3></div>
+        <div class="card" style="border-top:2px solid rgba(139,92,246,0.5);">
+          <div class="card-header" style="border-bottom:1px solid var(--border);padding-bottom:12px;">
+            <h3 style="margin:0;display:flex;align-items:center;gap:8px;"><span>💉</span> Binary Backdoor
+              <span style="font-size:10px;font-weight:400;color:var(--text-muted);margin-left:auto;text-transform:uppercase;letter-spacing:1px;">Trojanizer</span>
+            </h3>
+            <p style="font-size:11px;color:var(--text-muted);margin:6px 0 0 0;">Original app runs normally · Agent calls back silently · Icon preserved</p>
+          </div>
           <div class="card-body padded">
-            <p style="font-size:12px;color:var(--text-muted);margin-bottom:14px">Inject Phantom agent into a legitimate executable. The original app runs normally + agent calls back silently.</p>
-            <div style="margin-bottom:10px">
-              <label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Input Binary</label>
+
+            <!-- Step 1: Target Binary -->
+            <div style="margin-bottom:14px;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                <span style="background:rgba(139,92,246,0.2);color:#a78bfa;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">1</span>
+                <span style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;">Select Target Binary</span>
+              </div>
               <div style="display:flex;gap:6px;margin-bottom:6px;">
-                <select id="bd-binary-select" onchange="onBinarySelect()" style="flex:1;padding:10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;">
-                  <option value="">-- Select uploaded binary --</option>
+                <select id="bd-binary-select" onchange="onBinarySelect()" style="flex:1;padding:9px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;">
+                  <option value="">— Choose uploaded binary —</option>
                 </select>
-                <label style="display:inline-flex;align-items:center;gap:6px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:0 14px;cursor:pointer;font-size:12px;color:var(--text-muted);white-space:nowrap;" title="Upload a binary to the server">
+                <label style="display:inline-flex;align-items:center;gap:5px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:0 12px;cursor:pointer;font-size:12px;color:var(--accent-light);white-space:nowrap;font-weight:600;" title="Upload binary to server">
                   ⬆ Upload
                   <input type="file" id="bd-upload-file" onchange="uploadBinary()" style="display:none;" accept=".exe,.elf,.bin,.so,.dll">
                 </label>
               </div>
-              <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px;">Or enter a custom path on the server:</div>
-              <input type="text" id="bd-input" placeholder="/tmp/putty.exe or C:\tools\putty.exe" style="width:100%;padding:8px 10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px;font-family:monospace;">
+              <input type="text" id="bd-input" placeholder="or enter server path: /tmp/app.exe" style="width:100%;padding:7px 10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-muted);font-size:11px;font-family:monospace;box-sizing:border-box;">
             </div>
-            <div style="margin-bottom:10px">
-              <label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Listener (Callback)</label>
-              <select id="bd-listener" style="width:100%;padding:10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;margin-bottom:6px">
-                <option value="">-- Select listener --</option>
+
+            <!-- Step 2: Listener -->
+            <div style="margin-bottom:14px;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                <span style="background:rgba(139,92,246,0.2);color:#a78bfa;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">2</span>
+                <span style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;">Callback Listener</span>
+              </div>
+              <select id="bd-listener" style="width:100%;padding:9px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;margin-bottom:6px;box-sizing:border-box;">
+                <option value="">— Select listener —</option>
               </select>
-              <input type="text" id="bd-url" placeholder="http://172.20.41.154:8080" style="width:100%;padding:10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;font-family:monospace">
+              <input type="text" id="bd-url" placeholder="http://172.20.41.154:8080" style="width:100%;padding:7px 10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px;font-family:monospace;box-sizing:border-box;">
             </div>
-            <div style="margin-bottom:10px">
-              <label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Output Path (optional)</label>
-              <input type="text" id="bd-output" placeholder="auto-generated" style="width:100%;padding:10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;font-family:monospace">
-            </div>
-            <div style="margin-bottom:12px;">
-              <label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Obfuscation</label>
-              <div style="display:flex;gap:8px;">
-                <label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;flex:1;justify-content:center;">
-                  <input type="radio" name="bd-obfuscate" value="none" checked> None
+
+            <!-- Step 3: Options -->
+            <div style="margin-bottom:14px;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                <span style="background:rgba(139,92,246,0.2);color:#a78bfa;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">3</span>
+                <span style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:600;">Options</span>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:9px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;color:var(--text-primary);">
+                  <input type="radio" name="bd-obfuscate" value="none" checked style="accent-color:#a78bfa;"> None
+                  <span style="color:var(--text-muted);font-size:10px;margin-left:auto;">standard</span>
                 </label>
-                <label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;flex:1;justify-content:center;">
-                  <input type="radio" name="bd-obfuscate" value="garble"> <span style="color:#a78bfa;font-weight:600;">Garble</span> (AV evasion)
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:9px 12px;background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.3);border-radius:var(--radius);font-size:12px;color:var(--text-primary);">
+                  <input type="radio" name="bd-obfuscate" value="garble" style="accent-color:#a78bfa;"> <span style="color:#a78bfa;font-weight:700;">Garble</span>
+                  <span style="color:var(--text-muted);font-size:10px;margin-left:auto;">AV bypass</span>
                 </label>
               </div>
             </div>
-            <button onclick="backdoorBinary()" class="btn" style="width:100%;padding:12px;font-size:14px">💉 Backdoor Binary</button>
-            <div id="bd-result" style="margin-top:10px;font-size:13px"></div>
+
+            <!-- Generate button -->
+            <button onclick="backdoorBinary()" id="bd-btn" style="width:100%;padding:12px;font-size:14px;font-weight:700;background:linear-gradient(135deg,rgba(139,92,246,0.8),rgba(99,102,241,0.8));border:none;border-radius:var(--radius);color:#fff;cursor:pointer;transition:opacity .15s;letter-spacing:0.3px;" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+              💉 &nbsp;Backdoor Binary
+            </button>
+
+            <!-- Result area -->
+            <div id="bd-result" style="margin-top:12px;font-size:13px;"></div>
           </div>
         </div>
 
@@ -2817,8 +2839,10 @@ async function backdoorBinary() {
 
   if (!input || !url) { alert('Select a binary (or enter a path) and choose a listener'); return; }
 
-  const label = obfuscate ? 'Backdooring + garbling (this takes a few minutes)...' : 'Backdooring binary...';
-  result.innerHTML = '<span style="color:var(--yellow)">⚙️ '+label+'</span>';
+  const btn = document.getElementById('bd-btn');
+  const spinLabel = obfuscate ? '⚙️ Garbling agent + bundling… (may take 2–3 min)' : '⚙️ Bundling binary…';
+  result.innerHTML = '<div style="background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.2);border-radius:var(--radius);padding:12px;text-align:center;color:#a78bfa;font-size:13px;font-weight:600;">'+spinLabel+'</div>';
+  if (btn) { btn.disabled = true; btn.style.opacity = '.6'; }
 
   try {
     const resp = await fetch('/api/payload/backdoor/binary', {
@@ -2827,13 +2851,35 @@ async function backdoorBinary() {
     });
     const data = await resp.json();
     if (data.error) {
-      result.innerHTML = '<span style="color:var(--red)">Error: '+data.error+'</span>';
+      result.innerHTML = '<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:var(--radius);padding:12px;">'
+        + '<div style="color:var(--red);font-weight:700;margin-bottom:4px;">❌ Build Failed</div>'
+        + '<div style="font-size:12px;color:var(--text-muted);white-space:pre-wrap;">'+data.error.replace(/</g,'&lt;')+'</div></div>';
     } else {
-      const badge = obfuscate ? ' <span style="background:rgba(139,92,246,0.2);color:#a78bfa;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700;">GARBLED</span>' : '';
-      result.innerHTML = '<span style="color:var(--green)">✓ Backdoored'+badge+' — '+data.filepath+' ('+data.size+')</span>' +
-        '<br><a href="/api/payload/download?file='+encodeURIComponent(data.filepath)+'" style="color:var(--cyan);font-size:12px;text-decoration:none;">⬇ Download</a>';
+      const fname = data.filepath ? data.filepath.split('/').pop() : 'output.exe';
+      const obfBadge = obfuscate ? '<span style="background:rgba(139,92,246,0.2);color:#a78bfa;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:1px;margin-left:6px;">GARBLED</span>' : '';
+      const dlUrl = '/api/payload/download?file=' + encodeURIComponent(data.filepath);
+      result.innerHTML =
+        '<div style="border:1px solid rgba(16,185,129,0.3);border-radius:var(--radius);overflow:hidden;">'
+        + '<div style="background:rgba(16,185,129,0.08);padding:10px 14px;display:flex;align-items:center;gap:8px;">'
+        + '<span style="font-size:22px;">💉</span>'
+        + '<div><div style="color:var(--green);font-weight:700;font-size:13px;">Backdoor Ready '+obfBadge+'</div>'
+        + '<div style="color:var(--text-muted);font-size:11px;margin-top:1px;">Original icon preserved · Agent hidden as msupdate_svc.exe</div></div></div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;border-top:1px solid rgba(16,185,129,0.2);">'
+        + '<div style="padding:8px 14px;border-right:1px solid rgba(16,185,129,0.2);">'
+        + '<div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;">File</div>'
+        + '<div style="font-size:11px;color:var(--accent-light);font-family:monospace;word-break:break-all;">'+fname+'</div></div>'
+        + '<div style="padding:8px 14px;">'
+        + '<div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;">Size</div>'
+        + '<div style="font-size:12px;color:var(--blue);font-weight:600;">'+(data.size||'—')+'</div></div></div>'
+        + '<div style="padding:10px 14px;border-top:1px solid rgba(16,185,129,0.2);">'
+        + '<a href="'+dlUrl+'" style="display:flex;align-items:center;justify-content:center;gap:8px;background:var(--green);color:#000;font-weight:700;font-size:13px;padding:10px;border-radius:var(--radius);text-decoration:none;" onmouseover="this.style.opacity=\'.85\'" onmouseout="this.style.opacity=\'1\'">'
+        + '⬇ &nbsp;Download '+fname+'</a></div></div>';
+      loadBinaryList();
     }
-  } catch(e) { result.innerHTML = '<span style="color:var(--red)">'+e.message+'</span>'; }
+  } catch(e) {
+    result.innerHTML = '<div style="color:var(--red);padding:10px;">⚠️ '+e.message+'</div>';
+  }
+  if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
 }
 
 async function generatePersistBackdoor() {
