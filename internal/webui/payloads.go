@@ -705,3 +705,83 @@ func (w *WebUI) handleLoaderGenerate(rw http.ResponseWriter, r *http.Request) {
 
 	writeJSON(rw, resp)
 }
+
+const binaryStageDir = "build/payloads/staged"
+
+// handleListBinaries returns all staged input binaries available for backdooring.
+func (w *WebUI) handleListBinaries(rw http.ResponseWriter, r *http.Request) {
+	os.MkdirAll(binaryStageDir, 0755)
+	entries, err := os.ReadDir(binaryStageDir)
+	if err != nil {
+		writeJSON(rw, []interface{}{})
+		return
+	}
+
+	type BinaryEntry struct {
+		Name string `json:"name"`
+		Path string `json:"path"`
+		Size string `json:"size"`
+		Ext  string `json:"ext"`
+	}
+
+	var result []BinaryEntry
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		info, _ := e.Info()
+		size := "?"
+		if info != nil {
+			kb := float64(info.Size()) / 1024
+			if kb >= 1024 {
+				size = fmt.Sprintf("%.1f MB", kb/1024)
+			} else {
+				size = fmt.Sprintf("%.0f KB", kb)
+			}
+		}
+		path := filepath.Join(binaryStageDir, e.Name())
+		result = append(result, BinaryEntry{
+			Name: e.Name(),
+			Path: path,
+			Size: size,
+			Ext:  strings.ToLower(filepath.Ext(e.Name())),
+		})
+	}
+	if result == nil {
+		result = []BinaryEntry{}
+	}
+	writeJSON(rw, result)
+}
+
+// handleUploadBinary accepts a multipart upload and saves it to the stage directory.
+func (w *WebUI) handleUploadBinary(rw http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(rw, "POST required", 405)
+		return
+	}
+	r.ParseMultipartForm(100 << 20) // 100 MB max
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		writeJSON(rw, map[string]string{"error": "no file provided"})
+		return
+	}
+	defer file.Close()
+
+	os.MkdirAll(binaryStageDir, 0755)
+	destPath := filepath.Join(binaryStageDir, filepath.Base(header.Filename))
+
+	// Read and write
+	data := make([]byte, header.Size)
+	n, _ := file.Read(data)
+	if err := os.WriteFile(destPath, data[:n], 0755); err != nil {
+		writeJSON(rw, map[string]string{"error": "failed to save file: " + err.Error()})
+		return
+	}
+
+	writeJSON(rw, map[string]interface{}{
+		"success": true,
+		"name":    header.Filename,
+		"path":    destPath,
+		"size":    fmt.Sprintf("%.1f KB", float64(n)/1024),
+	})
+}

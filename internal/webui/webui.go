@@ -57,6 +57,8 @@ func (w *WebUI) Start() error {
 	mux.HandleFunc("/api/payload/backdoor", w.auth.AuthMiddleware(w.handleBackdoorGenerate))
 	mux.HandleFunc("/api/payload/backdoor/types", w.auth.AuthMiddleware(w.handleBackdoorTypes))
 	mux.HandleFunc("/api/payload/backdoor/binary", w.auth.AuthMiddleware(w.handleBinaryBackdoor))
+	mux.HandleFunc("/api/payload/binaries", w.auth.AuthMiddleware(w.handleListBinaries))
+	mux.HandleFunc("/api/payload/binaries/upload", w.auth.AuthMiddleware(w.handleUploadBinary))
 	mux.HandleFunc("/api/payload/loader", w.auth.AuthMiddleware(w.handleLoaderGenerate))
 
 	// Listener management API (auth required)
