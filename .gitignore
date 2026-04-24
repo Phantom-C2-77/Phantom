@@ -37,6 +37,9 @@ loot/
 configs/server.key
 configs/.phantom_creds
 
+# Environment / secrets — never commit
+deployments/redirector/.env
+
 # Lab/CTF artifacts — never commit
 *.ccache
 *.pvk

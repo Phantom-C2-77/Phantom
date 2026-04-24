@@ -5,6 +5,8 @@ services:
     image: caddy:alpine
     container_name: phantom-redirector
     restart: unless-stopped
+    env_file:
+      - .env
     ports:
       - "80:80"     # HTTP → HTTPS redirect
       - "443:443"   # HTTPS — www.YOUR_DOMAIN.com
