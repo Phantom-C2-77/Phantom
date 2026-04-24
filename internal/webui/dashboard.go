@@ -1421,6 +1421,8 @@ async function refreshAll() {
   const agents = await fetchJ('/api/agents');
   const listeners = await fetchJ('/api/listeners');
   window._cachedListeners = listeners;
+  populateListenerSelector();
+  populateBackdoorListeners();
   const tasks = await fetchJ('/api/tasks');
   const events = await fetchJ('/api/events') || [];
 
@@ -2785,24 +2787,46 @@ async function generatePersistBackdoor() {
 function populateBackdoorListeners() {
   const sel = document.getElementById('bd-listener');
   if (!sel) return;
+  const cur = sel.value;
   let opts = '<option value="">-- Select listener --</option>';
-  if (window._cachedListeners) {
+
+  if (window._cachedListeners && window._cachedListeners.length > 0) {
+    opts += '<optgroup label="Active Listeners">';
     window._cachedListeners.forEach(l => {
       if (l.status === 'running') {
-        const proto = l.type === 'HTTPS' ? 'https' : 'http';
-        const url = proto + '://' + l.bind;
+        const proto = (l.type||'').toUpperCase() === 'HTTPS' ? 'https' : 'http';
+        // Replace 0.0.0.0 with the window's location hostname for a usable URL
+        const bind = l.bind.replace('0.0.0.0', window.location.hostname);
+        const url = proto + '://' + bind;
         opts += '<option value="'+url+'">'+l.name+' ('+url+')</option>';
       }
     });
+    opts += '</optgroup>';
   }
-  if (window._cachedPresets) {
+
+  if (window._cachedPresets && window._cachedPresets.length > 0) {
+    opts += '<optgroup label="Saved Presets">';
     window._cachedPresets.forEach(p => {
-      const proto = p.type === 'https' ? 'https' : 'http';
-      const url = proto + '://' + p.bind;
-      opts += '<option value="'+url+'">'+p.name+' ('+url+')</option>';
+      const proto = (p.type||'http').toLowerCase() === 'https' ? 'https' : 'http';
+      const bind = p.bind.replace('0.0.0.0', window.location.hostname);
+      const url = proto + '://' + bind;
+      opts += '<option value="'+url+'">💾 '+p.name+' ('+url+')</option>';
     });
+    opts += '</optgroup>';
   }
+
   sel.innerHTML = opts;
+  if (cur) sel.value = cur;
+  // Auto-fill URL field if only one option
+  if (!cur && window._cachedListeners) {
+    const running = window._cachedListeners.filter(l => l.status === 'running');
+    if (running.length === 1) {
+      const proto = (running[0].type||'').toUpperCase() === 'HTTPS' ? 'https' : 'http';
+      const bind = running[0].bind.replace('0.0.0.0', window.location.hostname);
+      const urlEl = document.getElementById('bd-url');
+      if (urlEl && !urlEl.value) urlEl.value = proto + '://' + bind;
+    }
+  }
 }
 
 document.getElementById('bd-listener').addEventListener('change', function() {
