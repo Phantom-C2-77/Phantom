@@ -1,0 +1,31 @@
+hostname BogusSwitch
+
+! Configure VLAN 10 and VLAN 20
+vlan 10
+ name Sales
+vlan 20
+ name IT
+
+! Assign interfaces to VLANs
+interface GigabitEthernet0/1
+ switchport mode access
+ switchport access vlan 10
+ spanning-tree portfast
+
+interface GigabitEthernet0/2
+ switchport mode access
+ switchport access vlan 20
+ spanning-tree portfast
+
+! Enable management access
+interface Vlan1
+ ip address 192.168.1.1 255.255.255.0
+ no shutdown
+
+! Enable SSH
+ip domain-name bogus.local
+crypto key generate rsa
+username admin secret puppet
+line vty 0 4
+ login local
+ transport input ssh

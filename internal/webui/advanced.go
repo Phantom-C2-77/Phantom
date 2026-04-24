@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -235,6 +236,7 @@ type PayloadRecord struct {
 	Size      string `json:"size"`
 	Listener  string `json:"listener"`
 	CreatedAt string `json:"created_at"`
+	Exists    bool   `json:"exists"` // whether the file still exists on disk
 }
 
 func AddPayloadRecord(ptype, filename, filepath, size, listener string) {
@@ -252,6 +254,13 @@ func (w *WebUI) handlePayloadHistory(rw http.ResponseWriter, r *http.Request) {
 	defer payloadHistoryMu.Unlock()
 	if payloadHistory == nil {
 		payloadHistory = []PayloadRecord{}
+	}
+	// Check file existence for each record
+	for i := range payloadHistory {
+		if payloadHistory[i].FilePath != "" {
+			_, err := os.Stat(payloadHistory[i].FilePath)
+			payloadHistory[i].Exists = err == nil
+		}
 	}
 	writeJSON(rw, payloadHistory)
 }
@@ -361,6 +370,32 @@ func (w *WebUI) handleAgentRename(rw http.ResponseWriter, r *http.Request) {
 	a.Name = req.NewName
 	w.server.DB.UpdateAgentName(a.ID, req.NewName)
 	writeJSON(rw, map[string]string{"status": "renamed", "name": req.NewName})
+}
+
+// ══════════════════════════════════════════
+//  AGENT TAGS
+// ══════════════════════════════════════════
+
+func (w *WebUI) handleAgentTags(rw http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(rw, "POST required", 405)
+		return
+	}
+	var req struct {
+		Agent string `json:"agent"`
+		Tags  string `json:"tags"` // comma-separated, e.g. "red-team,pivoted"
+	}
+	json.NewDecoder(r.Body).Decode(&req)
+
+	a, _ := w.server.AgentMgr.Get(req.Agent)
+	if a == nil {
+		writeJSON(rw, map[string]string{"error": "agent not found"})
+		return
+	}
+
+	a.Tags = req.Tags
+	w.server.DB.UpdateAgentTags(a.ID, req.Tags)
+	writeJSON(rw, map[string]string{"status": "ok", "tags": req.Tags})
 }
 
 // ══════════════════════════════════════════

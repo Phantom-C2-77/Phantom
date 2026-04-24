@@ -73,6 +73,7 @@ func (w *WebUI) Start() error {
 	// Loot & advanced features (auth required)
 	mux.HandleFunc("/api/loot", w.auth.AuthMiddleware(w.handleLoot))
 	mux.HandleFunc("/api/agent/rename", w.auth.AuthMiddleware(w.handleAgentRename))
+	mux.HandleFunc("/api/agent/tags", w.auth.AuthMiddleware(w.handleAgentTags))
 	mux.HandleFunc("/api/autotasks", w.auth.AuthMiddleware(w.handleAutoTasks))
 	mux.HandleFunc("/api/auditlog", w.auth.AuthMiddleware(w.handleAuditLog))
 	mux.HandleFunc("/api/templates", w.auth.AuthMiddleware(w.handleCmdTemplates))
@@ -126,19 +127,28 @@ func (w *WebUI) handleAPIAgents(rw http.ResponseWriter, r *http.Request) {
 	})
 
 	type agentResp struct {
-		ID       string `json:"id"`
-		Name     string `json:"name"`
-		OS       string `json:"os"`
-		Hostname string `json:"hostname"`
-		Username string `json:"username"`
-		IP       string `json:"ip"`
-		Sleep    string `json:"sleep"`
-		LastSeen string `json:"last_seen"`
-		Status   string `json:"status"`
+		ID       string   `json:"id"`
+		Name     string   `json:"name"`
+		OS       string   `json:"os"`
+		Hostname string   `json:"hostname"`
+		Username string   `json:"username"`
+		IP       string   `json:"ip"`
+		Sleep    string   `json:"sleep"`
+		LastSeen string   `json:"last_seen"`
+		Status   string   `json:"status"`
+		Tags     []string `json:"tags"`
 	}
 
 	var resp []agentResp
 	for _, a := range agents {
+		tags := []string{}
+		if a.Tags != "" {
+			for _, t := range strings.Split(a.Tags, ",") {
+				if t = strings.TrimSpace(t); t != "" {
+					tags = append(tags, t)
+				}
+			}
+		}
 		resp = append(resp, agentResp{
 			ID:       a.ID,
 			Name:     a.Name,
@@ -149,6 +159,7 @@ func (w *WebUI) handleAPIAgents(rw http.ResponseWriter, r *http.Request) {
 			Sleep:    fmt.Sprintf("%ds/%d%%", a.Sleep, a.Jitter),
 			LastSeen: util.TimeAgo(a.LastSeen),
 			Status:   a.Status,
+			Tags:     tags,
 		})
 	}
 	if resp == nil {

