@@ -36,3 +36,23 @@ loot/
 *.log
 configs/server.key
 configs/.phantom_creds
+
+# Lab/CTF artifacts — never commit
+*.ccache
+*.pvk
+*.der
+credman.txt
+root.txt
+root_ad_dump.txt
+flag*.txt
+f.txt
+SECURITY
+config
+puppet.conf
+ed25519
+ed25519.pub
+*.ps1
+*.json
+dc01*
+task_root.xml
+.claude/
