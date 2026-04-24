@@ -386,6 +386,8 @@ func (w *WebUI) buildAgentBinary(req PayloadRequest) PayloadResponse {
 		size = fmt.Sprintf("%.1f MB", mb)
 	}
 
+	AddPayloadRecord(req.Type, filename, outputPath, size, req.ListenerURL)
+
 	return PayloadResponse{
 		Success:  true,
 		Message:  fmt.Sprintf("Agent built: %s/%s (%s)", targetOS, targetArch, size),
