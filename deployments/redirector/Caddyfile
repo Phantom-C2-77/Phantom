@@ -5,6 +5,11 @@
 www.YOUR_DOMAIN.com:443 {
     tls internal
 
+    log {
+        output stdout
+        format json
+    }
+
     @c2 path /api/v1/* /cdn-cgi/* /common/oauth2/* /app/*
 
     handle @c2 {
