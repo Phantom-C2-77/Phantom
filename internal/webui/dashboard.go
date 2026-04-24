@@ -765,26 +765,54 @@ tr.clickable { cursor: pointer; }
         </div>
 
         <!-- ExC2 Channels -->
-        <div class="card">
-          <div class="card-header"><h3><span>📡</span> ExC2 Channels</h3><span style="font-size:11px;color:var(--text-muted)">Alternative transports</span></div>
+        <div class="card" style="border-top:2px solid rgba(56,189,248,0.5)">
+          <div class="card-header" style="display:flex;align-items:center;justify-content:space-between">
+            <h3 style="margin:0;display:flex;align-items:center;gap:8px"><span>📡</span> ExC2 Channels</h3>
+            <span id="exchannel-status-badge" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:rgba(100,100,100,0.12);color:var(--text-muted);border:1px solid var(--border)">INACTIVE</span>
+          </div>
           <div class="card-body padded">
-            <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px">Route C2 traffic via Slack, Teams, or other SaaS channels to bypass egress controls.</p>
-            <div style="display:flex;gap:6px;margin-bottom:10px;align-items:end">
-              <div style="flex:1">
-                <label style="display:block;font-size:10px;color:var(--text-muted);text-transform:uppercase;margin-bottom:3px">Channel</label>
-                <select id="exchannel-name" style="width:100%;padding:6px 10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px;">
-                  <option value="slack">Slack</option>
-                  <option value="teams">Microsoft Teams</option>
-                  <option value="gist">GitHub Gist</option>
-                </select>
-              </div>
+            <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Route C2 traffic through SaaS platforms to bypass egress controls.</p>
+
+            <!-- Channel selector cards -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:14px">
+              <label id="exc-card-slack" onclick="selectExChannel('slack')" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px;border:2px solid rgba(56,189,248,0.5);border-radius:8px;cursor:pointer;background:rgba(56,189,248,0.08);text-align:center">
+                <span style="font-size:20px">💬</span>
+                <span style="font-size:11px;font-weight:600;color:#0ea5e9">Slack</span>
+                <input type="radio" name="exchannel-radio" value="slack" checked style="display:none">
+              </label>
+              <label id="exc-card-teams" onclick="selectExChannel('teams')" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:var(--bg-input);text-align:center">
+                <span style="font-size:20px">🟦</span>
+                <span style="font-size:11px;font-weight:600;color:var(--text-muted)">Teams</span>
+                <input type="radio" name="exchannel-radio" value="teams" style="display:none">
+              </label>
+              <label id="exc-card-gist" onclick="selectExChannel('gist')" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:var(--bg-input);text-align:center">
+                <span style="font-size:20px">🐙</span>
+                <span style="font-size:11px;font-weight:600;color:var(--text-muted)">Gist</span>
+                <input type="radio" name="exchannel-radio" value="gist" style="display:none">
+              </label>
             </div>
-            <div style="display:flex;gap:6px;margin-bottom:10px">
-              <button class="btn" onclick="sendExChannelCmd('start')" style="flex:1;padding:7px;font-size:12px">▶ Start</button>
-              <button class="qbtn danger" onclick="sendExChannelCmd('stop')" style="flex:1;padding:7px;font-size:12px">■ Stop</button>
-              <button class="qbtn" onclick="loadExChannels()" style="flex:1;padding:7px;font-size:12px">≡ List</button>
+
+            <!-- Hidden select kept for JS compatibility -->
+            <select id="exchannel-name" style="display:none">
+              <option value="slack">Slack</option>
+              <option value="teams">Microsoft Teams</option>
+              <option value="gist">GitHub Gist</option>
+            </select>
+
+            <!-- Token field -->
+            <div style="margin-bottom:14px">
+              <label style="display:block;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">API Token / Webhook</label>
+              <input id="exchannel-token" type="password" placeholder="xoxb-... or webhook URL" style="width:100%;padding:8px 10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px;font-family:monospace;box-sizing:border-box">
             </div>
-            <div id="exchannel-result" style="font-size:12px;font-family:monospace;color:var(--green);white-space:pre-wrap;min-height:32px"></div>
+
+            <!-- Controls -->
+            <div style="display:flex;gap:6px;margin-bottom:12px">
+              <button onclick="sendExChannelCmd('start')" style="flex:1;padding:9px;font-size:12px;font-weight:600;background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.4);border-radius:var(--radius);color:#16a34a;cursor:pointer">▶ Start</button>
+              <button onclick="sendExChannelCmd('stop')" style="flex:1;padding:9px;font-size:12px;font-weight:600;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:var(--radius);color:#ef4444;cursor:pointer">■ Stop</button>
+              <button onclick="loadExChannels()" class="qbtn" style="flex:1;padding:9px;font-size:12px">≡ List</button>
+            </div>
+
+            <div id="exchannel-result" style="font-size:12px;font-family:monospace;color:var(--green);white-space:pre-wrap;min-height:24px"></div>
           </div>
         </div>
       </div>
@@ -3723,6 +3751,18 @@ async function sendTCPPivotCmd(action) {
     }
     el.textContent = '⏳ Still running — check Tasks tab';
   } catch(e) { el.style.color='var(--red)'; el.textContent='✗ '+e.message; }
+}
+
+function selectExChannel(val) {
+  document.getElementById('exchannel-name').value = val;
+  ['slack','teams','gist'].forEach(c => {
+    const card = document.getElementById('exc-card-'+c);
+    if (!card) return;
+    const active = c === val;
+    card.style.border = active ? '2px solid rgba(56,189,248,0.5)' : '1px solid var(--border)';
+    card.style.background = active ? 'rgba(56,189,248,0.08)' : 'var(--bg-input)';
+    card.querySelector('span:nth-child(2)').style.color = active ? '#0ea5e9' : 'var(--text-muted)';
+  });
 }
 
 // ──── ExC2 Channel Control ────
