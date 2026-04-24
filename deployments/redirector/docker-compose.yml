@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  redirector:
+    image: caddy:alpine
+    container_name: phantom-redirector
+    restart: unless-stopped
+    ports:
+      - "8443:80"   # Local test: http://localhost:8443
+      - "443:443"   # Production: https://www.YOUR_DOMAIN.com
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - redir_net
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+networks:
+  redir_net:
+    driver: bridge

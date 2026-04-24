@@ -1,0 +1,21 @@
+# LOCAL TESTING: http://localhost:8443 → Phantom C2
+# PRODUCTION:   Change ":80" to "www.YOUR_DOMAIN.com" for auto-HTTPS
+
+:80 {
+    @c2 path /api/v1/* /cdn-cgi/* /common/oauth2/* /app/*
+
+    handle @c2 {
+        reverse_proxy 172.17.0.1:8080 {
+            header_up X-Real-IP {remote_host}
+            transport http {
+                read_timeout 120s
+            }
+        }
+    }
+
+    handle {
+        header -Server
+        header -X-Powered-By
+        respond "<html><body><h1>Digital Shield HQ</h1><p>All systems operational.</p></body></html>" 200
+    }
+}
