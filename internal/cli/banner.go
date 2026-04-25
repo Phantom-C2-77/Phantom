@@ -27,6 +27,16 @@ const (
 	colorBold   = "\033[1m"
 	colorDim    = "\033[2m"
 
+	// 256-color accents — richer violet + cyan matching Web UI palette
+	colorViolet     = "\033[38;5;99m"   // #7c3aed-ish
+	colorVioletBold = "\033[1;38;5;99m"
+	colorCyanBright = "\033[38;5;51m"   // bright cyan
+	colorCyanDim    = "\033[38;5;73m"   // muted cyan
+	colorGreenBright= "\033[38;5;84m"   // bright green for active pulse
+	colorRedBright  = "\033[38;5;203m"  // vivid red for dead
+	colorOrange     = "\033[38;5;214m"  // amber for idle/dormant
+	colorGrayDim    = "\033[38;5;240m"  // dark gray for secondary info
+
 	colorBgRed   = "\033[41m"
 	colorBgGreen = "\033[42m"
 

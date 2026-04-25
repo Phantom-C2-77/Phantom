@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -37,7 +38,6 @@ func (t *Table) Render() {
 	for _, row := range t.Rows {
 		for i, col := range row {
 			if i < len(widths) {
-				// Measure the ENHANCED value (with icons) not just the raw value
 				enhanced := enhanceValue(col, t.Headers[i])
 				raw := stripAnsi(enhanced)
 				dw := displayWidth(raw)
@@ -63,29 +63,24 @@ func (t *Table) Render() {
 		thinParts[i] = strings.Repeat("─", w)
 	}
 
-	topSep := "  " + colorDim + "╔" + strings.Join(sepParts, "╦") + "╗" + colorReset
-	midSep := "  " + colorDim + "╠" + strings.Join(sepParts, "╬") + "╣" + colorReset
-	divSep := "  " + colorDim + "╟" + strings.Join(thinParts, "╫") + "╢" + colorReset
-	botSep := "  " + colorDim + "╚" + strings.Join(sepParts, "╩") + "╝" + colorReset
+	topSep := "  " + colorGrayDim + "╔" + strings.Join(sepParts, "╦") + "╗" + colorReset
+	midSep := "  " + colorGrayDim + "╠" + strings.Join(sepParts, "╬") + "╣" + colorReset
+	divSep := "  " + colorGrayDim + "╟" + strings.Join(thinParts, "╫") + "╢" + colorReset
+	botSep := "  " + colorGrayDim + "╚" + strings.Join(sepParts, "╩") + "╝" + colorReset
 
 	// Title
 	if t.Title != "" {
-		totalWidth := 0
-		for _, w := range widths {
-			totalWidth += w
-		}
-		totalWidth += len(widths) - 1 // separators
-		fmt.Printf("\n  %s%s %s %s\n", colorBold, colorPurple, t.Title, colorReset)
+		fmt.Printf("\n  %s%s  %s%s\n", colorVioletBold, "▸", t.Title, colorReset)
 	}
 
 	// Top border
 	fmt.Println(topSep)
 
 	// Header row
-	fmt.Print("  " + colorDim + "║" + colorReset)
+	fmt.Print("  " + colorGrayDim + "║" + colorReset)
 	for i, h := range t.Headers {
 		padded := padCenter(h, widths[i])
-		fmt.Printf("%s%s%s%s%s%s", colorBold, colorCyan, padded, colorReset, colorDim, "║"+colorReset)
+		fmt.Printf("%s%s%s%s%s%s", colorBold, colorCyanBright, padded, colorReset, colorGrayDim, "║"+colorReset)
 	}
 	fmt.Println()
 
@@ -94,18 +89,24 @@ func (t *Table) Render() {
 
 	// Data rows
 	for idx, row := range t.Rows {
-		fmt.Print("  " + colorDim + "║" + colorReset)
+		// Subtle alternating row dim
+		rowDim := ""
+		rowReset := ""
+		if idx%2 == 1 {
+			rowDim = colorDim
+			rowReset = colorReset
+		}
+
+		fmt.Print("  " + colorGrayDim + "║" + colorReset)
 		for i := range t.Headers {
 			val := ""
 			if i < len(row) {
 				val = row[i]
 			}
-			// Apply color + icons
-			colored := enhanceValue(val, t.Headers[i])
+			colored := rowDim + enhanceValue(val, t.Headers[i]) + rowReset
 			rawEnhanced := stripAnsi(colored)
 			dw := displayWidth(rawEnhanced)
 
-			// Pad based on display width of enhanced value
 			padding := widths[i] - dw
 			if padding < 0 {
 				padding = 0
@@ -115,7 +116,7 @@ func (t *Table) Render() {
 			if rightPad < 0 {
 				rightPad = 0
 			}
-			fmt.Printf("%s%s%s%s%s", strings.Repeat(" ", leftPad), colored, strings.Repeat(" ", rightPad), colorDim, "║"+colorReset)
+			fmt.Printf("%s%s%s%s%s", strings.Repeat(" ", leftPad), colored, strings.Repeat(" ", rightPad), colorGrayDim, "║"+colorReset)
 		}
 		fmt.Println()
 
@@ -129,7 +130,7 @@ func (t *Table) Render() {
 	fmt.Println(botSep)
 
 	// Row count
-	fmt.Printf("  %s%d row(s)%s\n", colorDim, len(t.Rows), colorReset)
+	fmt.Printf("  %s%d row(s)%s\n\n", colorGrayDim, len(t.Rows), colorReset)
 }
 
 // padCenter centers a string within a given width (display-width aware).
@@ -149,76 +150,135 @@ func enhanceValue(val, header string) string {
 	lower := strings.ToLower(strings.TrimSpace(val))
 	headerLower := strings.ToLower(header)
 
-	// Status column — colored dots
-	if headerLower == "status" {
+	// Status column
+	if headerLower == "status" || headerLower == "state" {
 		switch lower {
 		case "active", "running":
-			return colorGreen + colorBold + "● " + val + colorReset
-		case "dormant":
-			return colorYellow + "◐ " + val + colorReset
+			return colorGreenBright + colorBold + "● " + colorReset + colorGreenBright + val + colorReset
+		case "dormant", "idle":
+			return colorOrange + "◑ " + val + colorReset
 		case "dead", "stopped":
-			return colorRed + "○ " + val + colorReset
+			return colorRedBright + "○ " + val + colorReset
+		case "pending":
+			return colorOrange + "⏳ " + val + colorReset
+		case "sent":
+			return colorCyanBright + "➤ " + val + colorReset
+		case "complete":
+			return colorGreenBright + "✓ " + val + colorReset
+		case "error":
+			return colorRedBright + "✗ " + val + colorReset
 		}
+		return colorGrayDim + val + colorReset
 	}
 
-	// OS column — icons
+	// OS column — icons + color
 	if headerLower == "os" {
 		switch {
 		case strings.Contains(lower, "windows") || strings.Contains(lower, "win"):
-			return "🪟 " + colorBlue + val + colorReset
+			return "🪟 " + colorCyanBright + val + colorReset
 		case strings.Contains(lower, "linux"):
-			return "🐧 " + colorGreen + val + colorReset
+			return "🐧 " + colorGreenBright + val + colorReset
 		case strings.Contains(lower, "android"):
-			return "📱 " + colorGreen + val + colorReset
-		case strings.Contains(lower, "ios") || strings.Contains(lower, "darwin"):
+			return "📱 " + colorGreenBright + val + colorReset
+		case strings.Contains(lower, "ios"):
 			return "🍎 " + colorWhite + val + colorReset
+		case strings.Contains(lower, "darwin"):
+			return "🍎 " + colorWhite + "macOS" + colorReset
 		case strings.Contains(lower, "macos"):
 			return "🍎 " + colorWhite + val + colorReset
 		}
+		return colorGrayDim + val + colorReset
 	}
 
-	// Task status
-	if headerLower == "status" || headerLower == "state" {
-		switch lower {
-		case "pending":
-			return colorYellow + "⏳ " + val + colorReset
-		case "sent":
-			return colorBlue + "📤 " + val + colorReset
-		case "complete":
-			return colorGreen + "✓ " + val + colorReset
-		case "error":
-			return colorRed + "✗ " + val + colorReset
-		}
-	}
-
-	// Name column — highlight
+	// Name column — violet bold
 	if headerLower == "name" {
-		return colorBold + colorPurple + val + colorReset
+		return colorVioletBold + val + colorReset
 	}
 
-	// IP column — monospace feel
-	if headerLower == "ip" || headerLower == "bind" {
-		return colorCyan + val + colorReset
+	// IP / Bind column — bright cyan monospace
+	if headerLower == "ip" || headerLower == "bind" || headerLower == "address" {
+		return colorCyanBright + val + colorReset
 	}
 
-	// Type column
+	// Hostname — dim white
+	if headerLower == "hostname" || headerLower == "host" {
+		return colorWhite + val + colorReset
+	}
+
+	// User column — dim
+	if headerLower == "user" || headerLower == "username" {
+		return colorGrayDim + val + colorReset
+	}
+
+	// Sleep column — dim, secondary info
+	if headerLower == "sleep" || headerLower == "interval" {
+		return colorGrayDim + val + colorReset
+	}
+
+	// Last Seen — color by recency
+	if headerLower == "last seen" || headerLower == "lastseen" || headerLower == "last_seen" {
+		return colorizeAge(val)
+	}
+
+	// Type column — orange
 	if headerLower == "type" {
-		return colorYellow + val + colorReset
+		return colorOrange + val + colorReset
 	}
 
-	// Default colorize
-	switch lower {
-	case "active", "running":
-		return colorGreen + val + colorReset
-	case "dormant", "pending", "sent":
-		return colorYellow + val + colorReset
-	case "dead", "error", "stopped":
-		return colorRed + val + colorReset
-	case "complete":
-		return colorCyan + val + colorReset
+	// ID column — dim
+	if headerLower == "id" {
+		return colorGrayDim + val + colorReset
 	}
 
 	return val
+}
+
+// colorizeAge colors a "X ago" or duration string by recency.
+func colorizeAge(val string) string {
+	lower := strings.ToLower(strings.TrimSpace(val))
+
+	// Parse "Xs ago", "Xm ago", "just now" etc.
+	if lower == "just now" || lower == "0s ago" {
+		return colorGreenBright + colorBold + val + colorReset
+	}
+
+	// Try to extract seconds
+	secs := parseAgoSeconds(lower)
+	switch {
+	case secs < 0:
+		return colorGrayDim + val + colorReset
+	case secs <= 30:
+		return colorGreenBright + val + colorReset
+	case secs <= 120:
+		return colorOrange + val + colorReset
+	default:
+		return colorRedBright + val + colorReset
+	}
+}
+
+// parseAgoSeconds parses "Xs ago", "Xm ago", "Xh ago" → seconds. Returns -1 if unparseable.
+func parseAgoSeconds(s string) int {
+	s = strings.TrimSuffix(s, " ago")
+	s = strings.TrimSpace(s)
+	if strings.HasSuffix(s, "s") {
+		n, err := strconv.Atoi(strings.TrimSuffix(s, "s"))
+		if err == nil {
+			return n
+		}
+	}
+	if strings.HasSuffix(s, "m") {
+		n, err := strconv.Atoi(strings.TrimSuffix(s, "m"))
+		if err == nil {
+			return n * 60
+		}
+	}
+	if strings.HasSuffix(s, "h") {
+		n, err := strconv.Atoi(strings.TrimSuffix(s, "h"))
+		if err == nil {
+			return n * 3600
+		}
+	}
+	return -1
 }
 
 // stripAnsi removes ANSI escape codes for width calculation.
@@ -242,22 +302,22 @@ func stripAnsi(s string) string {
 }
 
 // displayWidth returns the number of terminal columns a string occupies.
-// Emojis and CJK characters are 2 columns wide; ASCII is 1.
 func displayWidth(s string) int {
 	width := 0
 	runes := []rune(s)
 	for i := 0; i < len(runes); i++ {
 		r := runes[i]
-		if r >= 0x1F000 || // emojis (supplementary symbols)
-			(r >= 0x2600 && r <= 0x27BF) || // misc symbols
-			(r >= 0x2700 && r <= 0x27BF) || // dingbats
-			(r >= 0xFE00 && r <= 0xFE0F) || // variation selectors
-			(r >= 0x1F300 && r <= 0x1FAFF) || // extended emojis
-			r == 0x25CF || r == 0x25D0 || r == 0x25CB || // ● ◐ ○
-			r == 0x26A1 || // ⚡
-			r == 0x2713 || r == 0x2717 || // ✓ ✗
-			r == 0x23F3 || // ⏳
-			r == 0x1F4E4 { // 📤
+		if r >= 0x1F000 ||
+			(r >= 0x2600 && r <= 0x27BF) ||
+			(r >= 0x2700 && r <= 0x27BF) ||
+			(r >= 0xFE00 && r <= 0xFE0F) ||
+			(r >= 0x1F300 && r <= 0x1FAFF) ||
+			r == 0x25CF || r == 0x25D0 || r == 0x25CB || r == 0x25D1 ||
+			r == 0x26A1 ||
+			r == 0x2713 || r == 0x2717 ||
+			r == 0x23F3 ||
+			r == 0x27A4 ||
+			r == 0x1F4E4 {
 			width += 2
 		} else {
 			width += 1
@@ -265,3 +325,4 @@ func displayWidth(s string) int {
 	}
 	return width
 }
+

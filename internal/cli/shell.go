@@ -570,13 +570,35 @@ func (sh *Shell) cmdAgents() {
 	sh.server.AgentMgr.RefreshStatuses()
 	agents, _ = sh.server.AgentMgr.List()
 
-	t := NewTable("ID", "Name", "OS", "Hostname", "User", "IP", "Sleep", "Last Seen", "Status")
-	t.Title = fmt.Sprintf("⚡ AGENTS (%d connected)", len(agents))
+	// Count by status
+	active, dormant, dead := 0, 0, 0
 	for _, a := range agents {
+		switch a.Status {
+		case "active":
+			active++
+		case "dormant", "idle":
+			dormant++
+		default:
+			dead++
+		}
+	}
+	title := fmt.Sprintf("AGENTS   %s● %d active%s  %s◑ %d dormant%s  %s○ %d dead%s",
+		colorGreenBright, active, colorReset,
+		colorOrange, dormant, colorReset,
+		colorRedBright, dead, colorReset,
+	)
+
+	t := NewTable("ID", "Name", "OS", "Hostname", "User", "IP", "Sleep", "Last Seen", "Status")
+	t.Title = title
+	for _, a := range agents {
+		osArch := a.OS
+		if a.Arch != "" {
+			osArch = a.OS
+		}
 		t.AddRow(
 			util.ShortID(a.ID),
 			a.Name,
-			a.OS,
+			osArch,
 			a.Hostname,
 			a.Username,
 			a.ExternalIP,
@@ -626,16 +648,41 @@ func (sh *Shell) cmdInteract(args []string) {
 	switch agent.OS {
 	case "windows":
 		osIcon = "🪟"
+	case "darwin":
+		osIcon = "🍎"
 	case "android":
 		osIcon = "📱"
 	case "ios":
 		osIcon = "🍎"
 	}
+	statusColor := colorGreenBright
+	statusDot := "●"
+	if agent.Status == "dormant" || agent.Status == "idle" {
+		statusColor = colorOrange
+		statusDot = "◑"
+	} else if agent.Status == "dead" {
+		statusColor = colorRedBright
+		statusDot = "○"
+	}
 	fmt.Println()
-	fmt.Printf("  %s%s╭─ %s Session: %s ─╮%s\n", colorBold, colorGreen, osIcon, agent.Name, colorReset)
-	fmt.Printf("  %s%s│%s  %s@%s (%s/%s)%s\n", colorBold, colorGreen, colorReset, agent.Username, agent.Hostname, agent.OS, agent.Arch, colorReset)
-	fmt.Printf("  %s%s│%s  IP: %s%s%s  Sleep: %ds/%d%%%s\n", colorBold, colorGreen, colorReset, colorCyan, agent.ExternalIP, colorReset, agent.Sleep, agent.Jitter, colorReset)
-	fmt.Printf("  %s%s╰─ Type 'help' for commands ─╯%s\n", colorBold, colorGreen, colorReset)
+	fmt.Printf("  %s╔═══════════════════════════════════════════╗%s\n", colorViolet, colorReset)
+	fmt.Printf("  %s║%s  %s%s  Session: %s%-28s%s %s║%s\n",
+		colorViolet, colorReset,
+		osIcon, "",
+		colorVioletBold, agent.Name, colorReset,
+		colorViolet, colorReset)
+	fmt.Printf("  %s║%s  %s%-42s%s %s║%s\n",
+		colorViolet, colorReset,
+		colorGrayDim, fmt.Sprintf("%s@%s  (%s/%s)", agent.Username, agent.Hostname, agent.OS, agent.Arch), colorReset,
+		colorViolet, colorReset)
+	fmt.Printf("  %s║%s  IP  %s%-18s%s Sleep %s%ds/%d%%%s  %s%s %s%-6s%s %s║%s\n",
+		colorViolet, colorReset,
+		colorCyanBright, agent.ExternalIP, colorReset,
+		colorGrayDim, agent.Sleep, agent.Jitter, colorReset,
+		statusColor, statusDot, colorReset, agent.Status, colorReset,
+		colorViolet, colorReset)
+	fmt.Printf("  %s╚═══════════════════════════════════════════╝%s\n", colorViolet, colorReset)
+	fmt.Printf("  %s  type 'help' or '?' for all commands%s\n\n", colorGrayDim, colorReset)
 }
 
 func (sh *Shell) cmdListeners(args []string) {
