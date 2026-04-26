@@ -333,6 +333,26 @@ tr.clickable { cursor: pointer; }
 .qbtn.danger { border-color: rgba(239,68,68,0.3); }
 .qbtn.danger:hover { border-color: var(--red); color: var(--red); background: var(--red-dim); }
 
+/* ══════ PAYLOAD GENERATOR ══════ */
+.pl-cat-btn {
+  padding: 7px 14px; border-radius: 6px; border: 1px solid var(--border);
+  background: var(--bg-input); color: var(--text-muted); cursor: pointer;
+  font-size: 12px; font-weight: 500; transition: all 0.15s; white-space: nowrap;
+}
+.pl-cat-btn:hover { border-color: var(--violet); color: var(--violet-light); background: var(--violet-dim); }
+.pl-cat-active { border-color: var(--violet) !important; color: var(--violet-light) !important; background: var(--violet-dim) !important; font-weight: 700 !important; }
+.pl-type-card {
+  display: flex; flex-direction: column; gap: 5px; padding: 12px 10px;
+  border: 1px solid var(--border); border-radius: 8px; cursor: pointer;
+  background: var(--bg-secondary); transition: all 0.15s; text-align: center;
+}
+.pl-type-card:hover { border-color: var(--violet); background: var(--violet-dim); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(124,58,237,0.15); }
+.pl-type-card.selected { border-color: var(--violet) !important; border-width: 2px; background: var(--violet-dim) !important; box-shadow: 0 0 0 3px rgba(124,58,237,0.1); }
+.pl-type-card .pt-icon { font-size: 22px; }
+.pl-type-card .pt-name { font-size: 11px; font-weight: 700; color: var(--text-primary); }
+.pl-type-card .pt-desc { font-size: 9px; color: var(--text-muted); line-height: 1.3; }
+.pl-type-card .pt-badge { font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 8px; display: inline-block; margin-top: 2px; }
+
 /* ══════ SELECT ══════ */
 .select-wrap { position: relative; }
 .select-wrap select {
@@ -854,123 +874,131 @@ tr.clickable { cursor: pointer; }
 
     <!-- ══════ PAYLOADS ══════ -->
     <div id="p-payloads" class="page">
-      <div class="stats-grid" style="grid-template-columns:repeat(3,1fr); margin-bottom:16px;">
-        <div class="stat-card purple"><div class="stat-label">Agent Binaries</div><div class="stat-value purple">4</div></div>
-        <div class="stat-card blue"><div class="stat-label">Web Shells & Stagers</div><div class="stat-value blue">8</div></div>
-        <div class="stat-card yellow"><div class="stat-label">Mobile Payloads</div><div class="stat-value yellow">3+</div></div>
+
+      <!-- Stats bar -->
+      <div class="stats-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:20px">
+        <div class="stat-card purple"><div class="stat-label">Agent Binaries</div><div class="stat-value purple" style="font-size:26px">6</div><div class="stat-sub">Win · Linux · macOS · DLL</div></div>
+        <div class="stat-card blue"><div class="stat-label">Web Shells</div><div class="stat-value blue" style="font-size:26px">3</div><div class="stat-sub">ASPX · PHP · JSP</div></div>
+        <div class="stat-card green"><div class="stat-label">Stagers</div><div class="stat-value green" style="font-size:26px">3</div><div class="stat-sub">PS · Bash · Python</div></div>
+        <div class="stat-card yellow"><div class="stat-label">Phishing</div><div class="stat-value yellow" style="font-size:26px">2</div><div class="stat-sub">HTA · VBA Macro</div></div>
+        <div class="stat-card purple"><div class="stat-label">Mobile</div><div class="stat-value purple" style="font-size:26px">3+</div><div class="stat-sub">APK · iOS · 30 templates</div></div>
       </div>
 
-      <!-- Generator Form -->
-      <div class="card">
-        <div class="card-header"><h3><span>🔧</span> Payload Generator</h3></div>
+      <!-- Generator -->
+      <div class="card" style="border-top:2px solid var(--violet)">
+        <div class="card-header" style="display:flex;align-items:center;justify-content:space-between">
+          <h3 style="margin:0;display:flex;align-items:center;gap:8px"><span>🔧</span> Payload Generator</h3>
+          <span id="pl-selected-badge" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:var(--violet-dim);color:var(--violet-light);border:1px solid rgba(124,58,237,0.3)">No type selected</span>
+        </div>
         <div class="card-body padded">
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+          <div style="display:grid;grid-template-columns:1fr 340px;gap:20px">
 
-            <!-- Left: Config -->
+            <!-- Left: Type selector + config -->
             <div>
-              <div style="margin-bottom:12px;">
-                <label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Payload Type</label>
-                <select id="pl-type" style="width:100%;padding:10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;" onchange="onPayloadTypeChange()">
-                  <optgroup label="Agent Binaries">
-                    <option value="exe">🪟 Windows EXE (amd64)</option>
-                    <option value="exe-garble">🪟 Windows EXE (Obfuscated)</option>
-                    <option value="dll">📦 Windows DLL (rundll32 / regsvr32)</option>
-                    <option value="elf">🐧 Linux ELF (amd64)</option>
-                    <option value="elf-garble">🐧 Linux ELF (Obfuscated)</option>
-                    <option value="darwin">🍎 macOS (darwin/amd64)</option>
-                  </optgroup>
-                  <optgroup label="Web Shells">
-                    <option value="aspx">🌐 ASPX Web Shell (IIS)</option>
-                    <option value="php">🌐 PHP Web Shell</option>
-                    <option value="jsp">🌐 JSP Web Shell (Tomcat)</option>
-                  </optgroup>
-                  <optgroup label="Stagers">
-                    <option value="powershell">💻 PowerShell Stager</option>
-                    <option value="bash">💻 Bash Stager</option>
-                    <option value="python">🐍 Python Stager</option>
-                  </optgroup>
-                  <optgroup label="Phishing">
-                    <option value="hta">📧 HTA Application</option>
-                    <option value="vba">📧 VBA Macro</option>
-                  </optgroup>
-                  <optgroup label="Shellcode">
-                    <option value="shellcode">💉 Windows Shellcode (Donut PIC)</option>
-                  </optgroup>
-                  <optgroup label="Mobile">
-                    <option value="android">📱 Android Payload Pack</option>
-                    <option value="ios">🍎 iOS Payload Pack</option>
-                    <option value="app">📲 Fake Mobile App (30+ templates)</option>
-                  </optgroup>
-                </select>
+              <!-- Category tabs -->
+              <div style="display:flex;gap:4px;margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:12px">
+                <button onclick="plCategory('agent')" id="plcat-agent" class="pl-cat-btn pl-cat-active">⚡ Agent Binaries</button>
+                <button onclick="plCategory('shell')" id="plcat-shell" class="pl-cat-btn">🌐 Web Shells</button>
+                <button onclick="plCategory('stager')" id="plcat-stager" class="pl-cat-btn">💻 Stagers</button>
+                <button onclick="plCategory('phishing')" id="plcat-phishing" class="pl-cat-btn">📧 Phishing</button>
+                <button onclick="plCategory('mobile')" id="plcat-mobile" class="pl-cat-btn">📱 Mobile</button>
+                <button onclick="plCategory('shellcode')" id="plcat-shellcode" class="pl-cat-btn">💉 Shellcode</button>
               </div>
 
-              <div style="margin-bottom:12px;">
-                <label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Listener (Callback)</label>
-                <select id="pl-listener-select" onchange="onListenerSelect()" style="width:100%;padding:10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;margin-bottom:6px;">
-                  <option value="">-- Select a listener or preset --</option>
+              <!-- Payload type cards -->
+              <div id="pl-type-cards" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px"></div>
+
+              <!-- Hidden select kept for JS compat -->
+              <select id="pl-type" style="display:none" onchange="onPayloadTypeChange()">
+                <option value="exe">exe</option><option value="exe-garble">exe-garble</option>
+                <option value="dll">dll</option><option value="elf">elf</option>
+                <option value="elf-garble">elf-garble</option><option value="darwin">darwin</option>
+                <option value="aspx">aspx</option><option value="php">php</option>
+                <option value="jsp">jsp</option><option value="powershell">powershell</option>
+                <option value="bash">bash</option><option value="python">python</option>
+                <option value="hta">hta</option><option value="vba">vba</option>
+                <option value="shellcode">shellcode</option><option value="android">android</option>
+                <option value="ios">ios</option><option value="app">app</option>
+              </select>
+
+              <!-- Listener -->
+              <div style="margin-bottom:12px">
+                <label style="display:block;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px">Listener (Callback)</label>
+                <select id="pl-listener-select" onchange="onListenerSelect()" style="width:100%;padding:9px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px;margin-bottom:6px">
+                  <option value="">-- Select active listener --</option>
                 </select>
-                <input type="text" id="pl-url" placeholder="https://your-c2:443" style="width:100%;padding:10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;font-family:monospace;">
-                <div style="font-size:10px;color:var(--text-muted);margin-top:3px;">Select from above or type a custom URL</div>
+                <input type="text" id="pl-url" placeholder="https://your-domain.com" style="width:100%;padding:9px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px;font-family:monospace;box-sizing:border-box">
               </div>
 
-              <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px;">
+              <!-- Sleep + Jitter -->
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
                 <div>
-                  <label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Sleep (seconds)</label>
-                  <input type="number" id="pl-sleep" value="10" min="1" style="width:100%;padding:10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;">
+                  <label style="display:block;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px">Sleep (seconds)</label>
+                  <input type="number" id="pl-sleep" value="10" min="1" style="width:100%;padding:9px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px">
                 </div>
                 <div>
-                  <label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Jitter (%)</label>
-                  <input type="number" id="pl-jitter" value="20" min="0" max="50" style="width:100%;padding:10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;">
+                  <label style="display:block;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px">Jitter (%)</label>
+                  <input type="number" id="pl-jitter" value="20" min="0" max="50" style="width:100%;padding:9px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px">
                 </div>
               </div>
 
-              <!-- App template selector (hidden by default) -->
-              <div id="pl-app-row" style="margin-bottom:12px; display:none;">
-                <label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">App Template</label>
-                <select id="pl-app-template" style="width:100%;padding:10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:13px;">
+              <!-- App template (hidden) -->
+              <div id="pl-app-row" style="margin-bottom:12px;display:none">
+                <label style="display:block;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px">App Template</label>
+                <select id="pl-app-template" style="width:100%;padding:9px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:12px">
                   <option value="">Loading templates...</option>
                 </select>
               </div>
 
-              <!-- Obfuscation options -->
-              <div style="margin-bottom:12px;">
-                <label style="display:block;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Obfuscation Level</label>
-                <div style="display:flex;gap:8px">
-                  <label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;color:var(--text-primary);flex:1;justify-content:center">
-                    <input type="radio" name="pl-obfuscation" value="none" checked> None
+              <!-- Obfuscation -->
+              <div style="margin-bottom:14px">
+                <label style="display:block;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Obfuscation</label>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+                  <label id="obf-none" onclick="selectObf('none')" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px;border:2px solid var(--violet);border-radius:8px;cursor:pointer;background:var(--violet-dim);text-align:center">
+                    <span style="font-size:18px">🚫</span>
+                    <span style="font-size:11px;font-weight:700;color:var(--violet-light)">None</span>
+                    <span style="font-size:9px;color:var(--text-muted)">fastest build</span>
+                    <input type="radio" name="pl-obfuscation" value="none" checked style="display:none">
                   </label>
-                  <label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;color:var(--text-primary);flex:1;justify-content:center">
-                    <input type="radio" name="pl-obfuscation" value="strip"> Strip (ldflags -s -w)
+                  <label id="obf-strip" onclick="selectObf('strip')" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:var(--bg-input);text-align:center">
+                    <span style="font-size:18px">✂️</span>
+                    <span style="font-size:11px;font-weight:700;color:var(--text-muted)">Strip</span>
+                    <span style="font-size:9px;color:var(--text-muted)">-s -w, ~60% size</span>
+                    <input type="radio" name="pl-obfuscation" value="strip" style="display:none">
                   </label>
-                  <label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;color:var(--text-primary);flex:1;justify-content:center">
-                    <input type="radio" name="pl-obfuscation" value="garble"> Garble (full obfuscation)
+                  <label id="obf-garble" onclick="selectObf('garble')" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:var(--bg-input);text-align:center">
+                    <span style="font-size:18px">🛡️</span>
+                    <span style="font-size:11px;font-weight:700;color:var(--text-muted)">Garble</span>
+                    <span style="font-size:9px;color:var(--text-muted)">full AV bypass</span>
+                    <input type="radio" name="pl-obfuscation" value="garble" style="display:none">
                   </label>
                 </div>
               </div>
 
-              <!-- DLL usage hint -->
-              <div id="pl-dll-hint" style="display:none;margin-bottom:10px;padding:10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;color:var(--text-muted)">
-                <div style="color:var(--cyan);font-weight:600;margin-bottom:4px">📦 DLL Execution Methods</div>
-                <div style="font-family:monospace;font-size:11px;line-height:1.8">
+              <!-- DLL hint -->
+              <div id="pl-dll-hint" style="display:none;margin-bottom:12px;padding:10px 14px;background:var(--cyan-dim);border:1px solid rgba(6,182,212,0.3);border-radius:8px;font-size:12px">
+                <div style="color:var(--cyan);font-weight:700;margin-bottom:6px">📦 DLL Execution Methods</div>
+                <div style="font-family:monospace;font-size:11px;line-height:2;color:var(--text-secondary)">
                   rundll32.exe phantom.dll,Start<br>
                   regsvr32 /s /i phantom.dll<br>
                   regsvr32 phantom.dll
                 </div>
-                <div style="margin-top:4px;color:var(--text-muted)">After delivery, use <span style="color:var(--cyan)">pivot start</span> on the agent for SMB pivoting.</div>
               </div>
-
-              <button onclick="generatePayload()" class="btn" style="width:100%;padding:12px;font-size:14px;" id="pl-btn">
-                Generate Payload
-              </button>
             </div>
 
-            <!-- Right: Output -->
-            <div>
-              <div style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:16px;min-height:280px;" id="pl-output">
-                <div style="color:var(--text-muted);text-align:center;padding:40px 0;">
-                  <div style="font-size:40px;margin-bottom:12px;opacity:0.3;">🔧</div>
-                  <p>Select a payload type and click Generate</p>
-                  <p style="font-size:12px;margin-top:8px;">Output will appear here</p>
+            <!-- Right: Output panel -->
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <!-- Generate button -->
+              <button onclick="generatePayload()" id="pl-btn" style="width:100%;padding:14px;font-size:14px;font-weight:700;background:linear-gradient(135deg,var(--violet),rgba(99,102,241,0.9));border:none;border-radius:var(--radius);color:#fff;cursor:pointer;letter-spacing:0.5px;transition:opacity .15s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+                ⚡ &nbsp;Generate Payload
+              </button>
+
+              <!-- Output -->
+              <div id="pl-output" style="flex:1;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius-lg);min-height:320px;overflow:hidden">
+                <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:320px;gap:10px;color:var(--text-muted)">
+                  <div style="font-size:48px;opacity:0.15">⚡</div>
+                  <div style="font-size:13px;font-weight:600">Select a payload type</div>
+                  <div style="font-size:11px;opacity:.7">Output appears here after generation</div>
                 </div>
               </div>
             </div>
@@ -1565,6 +1593,7 @@ async function refreshAll() {
   populateListenerSelector();
   populateBackdoorListeners();
   bdTypeChanged();
+  plCategory('agent');
   loadBinaryList();
   const tasks = await fetchJ('/api/tasks');
   const events = await fetchJ('/api/events') || [];
@@ -2662,6 +2691,95 @@ function populateListenerSelector() {
 
   sel.innerHTML = opts;
   if (cur) sel.value = cur;
+}
+
+// ──── Payload Generator — type card system ────
+const PL_TYPES = {
+  agent: [
+    { value:'exe',        icon:'🪟', name:'Windows EXE',   desc:'amd64 · PE executable',      badge:'WINDOWS', bc:'rgba(99,102,241,0.15)', btc:'var(--violet-light)' },
+    { value:'exe-garble', icon:'🪟', name:'Windows EXE',   desc:'Garble obfuscated',           badge:'OBFUSC',  bc:'rgba(139,92,246,0.25)', btc:'#c4b5fd' },
+    { value:'dll',        icon:'📦', name:'Windows DLL',   desc:'rundll32 · regsvr32 · side',  badge:'DLL',     bc:'rgba(99,102,241,0.15)', btc:'var(--violet-light)' },
+    { value:'elf',        icon:'🐧', name:'Linux ELF',     desc:'amd64 · ELF binary',          badge:'LINUX',   bc:'rgba(6,182,212,0.15)',  btc:'var(--cyan)' },
+    { value:'elf-garble', icon:'🐧', name:'Linux ELF',     desc:'Garble obfuscated',           badge:'OBFUSC',  bc:'rgba(6,182,212,0.25)',  btc:'var(--cyan-light)' },
+    { value:'darwin',     icon:'🍎', name:'macOS',         desc:'darwin/amd64 · Intel',        badge:'MACOS',   bc:'rgba(255,255,255,0.06)',btc:'#e5e7eb' },
+  ],
+  shell: [
+    { value:'aspx', icon:'🌐', name:'ASPX Shell',    desc:'IIS / ASP.NET · 404 decoy',     badge:'IIS',    bc:'rgba(6,182,212,0.15)', btc:'var(--cyan)' },
+    { value:'php',  icon:'🌐', name:'PHP Shell',     desc:'Apache · Nginx · 5 exec methods',badge:'PHP',    bc:'rgba(6,182,212,0.15)', btc:'var(--cyan)' },
+    { value:'jsp',  icon:'🌐', name:'JSP Shell',     desc:'Tomcat / Java EE',               badge:'JAVA',   bc:'rgba(6,182,212,0.15)', btc:'var(--cyan)' },
+  ],
+  stager: [
+    { value:'powershell', icon:'💻', name:'PowerShell', desc:'Download + exec cradle',    badge:'WINDOWS', bc:'rgba(99,102,241,0.15)', btc:'var(--violet-light)' },
+    { value:'bash',       icon:'💻', name:'Bash',       desc:'curl / wget stager',        badge:'LINUX',   bc:'rgba(6,182,212,0.15)',  btc:'var(--cyan)' },
+    { value:'python',     icon:'🐍', name:'Python',     desc:'Cross-platform · SSL',      badge:'CROSS',   bc:'rgba(6,182,212,0.15)',  btc:'var(--cyan)' },
+  ],
+  phishing: [
+    { value:'hta', icon:'📧', name:'HTA App',     desc:'No macro warning · IE / MSHTA', badge:'PHISH', bc:'rgba(239,68,68,0.12)', btc:'#fca5a5' },
+    { value:'vba', icon:'📧', name:'VBA Macro',   desc:'Word / Excel · AutoOpen',       badge:'PHISH', bc:'rgba(239,68,68,0.12)', btc:'#fca5a5' },
+  ],
+  mobile: [
+    { value:'android', icon:'📱', name:'Android Pack',   desc:'Stager + phishing page',   badge:'APK',      bc:'rgba(6,182,212,0.15)', btc:'var(--cyan)' },
+    { value:'ios',     icon:'🍎', name:'iOS Pack',       desc:'MDM profile + phishing',   badge:'IOS',      bc:'rgba(255,255,255,0.06)',btc:'#e5e7eb' },
+    { value:'app',     icon:'📲', name:'Fake App',       desc:'30+ templates · full UI',  badge:'30+ TMPL', bc:'rgba(99,102,241,0.15)', btc:'var(--violet-light)' },
+  ],
+  shellcode: [
+    { value:'shellcode', icon:'💉', name:'Donut PIC',    desc:'x64 shellcode · in-memory', badge:'SHELLCODE', bc:'rgba(239,68,68,0.12)', btc:'#fca5a5' },
+  ],
+};
+
+let _plCurrentType = '';
+
+function plCategory(cat) {
+  // Update tab buttons
+  ['agent','shell','stager','phishing','mobile','shellcode'].forEach(c => {
+    const btn = document.getElementById('plcat-'+c);
+    if (btn) { btn.className = c === cat ? 'pl-cat-btn pl-cat-active' : 'pl-cat-btn'; }
+  });
+  // Render cards
+  const grid = document.getElementById('pl-type-cards');
+  const types = PL_TYPES[cat] || [];
+  grid.innerHTML = types.map(t =>
+    '<div class="pl-type-card' + (_plCurrentType === t.value ? ' selected' : '') + '" onclick="plSelectType(\'' + t.value + '\')" id="plcard-' + t.value + '">' +
+    '<div class="pt-icon">' + t.icon + '</div>' +
+    '<div class="pt-name">' + t.name + '</div>' +
+    '<div class="pt-desc">' + t.desc + '</div>' +
+    '<span class="pt-badge" style="background:' + t.bc + ';color:' + t.btc + '">' + t.badge + '</span>' +
+    '</div>'
+  ).join('');
+}
+
+function plSelectType(val) {
+  _plCurrentType = val;
+  // Update all card selection states
+  document.querySelectorAll('.pl-type-card').forEach(c => c.classList.remove('selected'));
+  const card = document.getElementById('plcard-'+val);
+  if (card) card.classList.add('selected');
+  // Sync hidden select
+  const sel = document.getElementById('pl-type');
+  if (sel) sel.value = val;
+  // Update badge
+  const all = Object.values(PL_TYPES).flat();
+  const meta = all.find(t => t.value === val);
+  const badge = document.getElementById('pl-selected-badge');
+  if (badge && meta) {
+    badge.textContent = meta.icon + ' ' + meta.name + ' · ' + meta.badge;
+    badge.style.background = meta.bc;
+    badge.style.color = meta.btc;
+    badge.style.borderColor = meta.btc.replace('var(--','').replace(')','');
+  }
+  onPayloadTypeChange();
+}
+
+function selectObf(val) {
+  ['none','strip','garble'].forEach(v => {
+    const el = document.getElementById('obf-'+v);
+    if (!el) return;
+    const active = v === val;
+    el.style.border = active ? '2px solid var(--violet)' : '1px solid var(--border)';
+    el.style.background = active ? 'var(--violet-dim)' : 'var(--bg-input)';
+    el.querySelector('span:nth-child(2)').style.color = active ? 'var(--violet-light)' : 'var(--text-muted)';
+    el.querySelector('input').checked = active;
+  });
 }
 
 function onListenerSelect() {
