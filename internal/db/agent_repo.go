@@ -144,6 +144,12 @@ func (db *Database) InsertPayloadRecord(id, ptype, filename, fpath, size, listen
 	return err
 }
 
+// DeletePayloadRecord removes a payload record by ID.
+func (db *Database) DeletePayloadRecord(id string) error {
+	_, err := db.conn.Exec(`DELETE FROM payload_history WHERE id = ?`, id)
+	return err
+}
+
 // ListPayloadHistory returns all payload records ordered by creation time.
 func (db *Database) ListPayloadHistory() ([]map[string]string, error) {
 	rows, err := db.conn.Query(

@@ -2866,21 +2866,36 @@ async function loadPayloadHistory() {
   try {
     const history = await fetchJ('/api/payload/history');
     if (!history || history.length === 0) {
-      table.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px">No payloads generated yet</td></tr>';
+      table.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:20px">No payloads generated yet</td></tr>';
       return;
     }
     table.innerHTML = history.slice().reverse().map(p => {
       const dlBtn = p.exists
-        ? '<a href="/api/payload/download?file='+encodeURIComponent(p.filepath)+'" class="qbtn" style="font-size:11px;padding:4px 10px;text-decoration:none;color:var(--green);">⬇ Download</a>'
-        : '<span style="font-size:10px;color:var(--text-muted);padding:4px 10px;border:1px solid var(--border);border-radius:4px;display:inline-block;">⚠ File missing</span>';
-      return '<tr><td style="color:var(--accent-light);font-size:11px">'+p.id+'</td>' +
-        '<td style="color:var(--cyan)">'+p.type+'</td>' +
-        '<td style="font-family:monospace;font-size:11px">'+p.filename+'</td>' +
-        '<td>'+p.size+'</td>' +
-        '<td style="font-size:11px;color:var(--text-muted)">'+p.listener+'</td>' +
+        ? '<a href="/api/payload/download?file='+encodeURIComponent(p.filepath)+'" class="qbtn" style="font-size:11px;padding:4px 10px;text-decoration:none;color:var(--cyan)">⬇ Download</a>'
+        : '<span style="font-size:10px;color:var(--text-muted);padding:4px 8px;border:1px solid var(--border);border-radius:4px;display:inline-block;">⚠ Missing</span>';
+      const delBtn = '<button onclick="deletePayloadHistory(\''+p.id+'\')" style="padding:4px 8px;font-size:11px;background:var(--red-dim);border:1px solid rgba(239,68,68,0.3);border-radius:4px;color:var(--red);cursor:pointer;margin-left:4px" title="Remove from history">✕</button>';
+      return '<tr>' +
+        '<td style="color:var(--violet-light);font-size:11px">'+p.id+'</td>' +
+        '<td><span style="background:var(--violet-dim);color:var(--violet-light);padding:2px 7px;border-radius:8px;font-size:10px;font-weight:700">'+p.type+'</span></td>' +
+        '<td style="font-family:monospace;font-size:11px;color:var(--text-primary)">'+p.filename+'</td>' +
+        '<td style="color:var(--text-secondary)">'+p.size+'</td>' +
+        '<td style="font-size:11px;color:var(--cyan);font-family:monospace">'+p.listener+'</td>' +
         '<td style="font-size:11px;color:var(--text-muted)">'+p.created_at+'</td>' +
-        '<td>'+dlBtn+'</td></tr>';
+        '<td style="white-space:nowrap">'+dlBtn+delBtn+'</td>' +
+        '</tr>';
     }).join('');
+  } catch(e) {}
+}
+
+async function deletePayloadHistory(id) {
+  try {
+    const resp = await fetch('/api/payload/history/delete', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({id: id})
+    });
+    const data = await resp.json();
+    if (data.success) loadPayloadHistory();
   } catch(e) {}
 }
 

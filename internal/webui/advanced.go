@@ -298,6 +298,38 @@ func (w *WebUI) handlePayloadHistory(rw http.ResponseWriter, r *http.Request) {
 	writeJSON(rw, payloadHistory)
 }
 
+func (w *WebUI) handleDeletePayloadHistory(rw http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(rw, map[string]interface{}{"error": "POST required"})
+		return
+	}
+	var req struct {
+		ID string `json:"id"`
+	}
+	json.NewDecoder(r.Body).Decode(&req)
+	if req.ID == "" {
+		writeJSON(rw, map[string]interface{}{"error": "id required"})
+		return
+	}
+
+	// Delete from DB
+	if w.server.DB != nil {
+		w.server.DB.DeletePayloadRecord(req.ID)
+	}
+
+	// Also remove from in-memory fallback
+	payloadHistoryMu.Lock()
+	for i, p := range payloadHistory {
+		if p.ID == req.ID {
+			payloadHistory = append(payloadHistory[:i], payloadHistory[i+1:]...)
+			break
+		}
+	}
+	payloadHistoryMu.Unlock()
+
+	writeJSON(rw, map[string]interface{}{"success": true})
+}
+
 // ══════════════════════════════════════════
 //  LOOT VIEWER
 // ══════════════════════════════════════════
