@@ -1672,8 +1672,8 @@ function osEmoji(os) {
   }
 }
 function osLabel(os) {
-  if (os === 'darwin') return 'macOS';
-  return os;
+  const labels = { windows:'Windows', linux:'Linux', darwin:'macOS', android:'Android', ios:'iOS' };
+  return labels[os] || os;
 }
 function osIcon(os) {
   const emoji = osEmoji(os);
