@@ -287,38 +287,75 @@ tr.clickable { cursor: pointer; }
 
 /* ══════ TERMINAL ══════ */
 .terminal {
-  background: linear-gradient(180deg, #0c0f1a 0%, #080a14 100%);
-  border: 1px solid var(--border); border-radius: var(--radius-lg);
-  overflow: hidden; box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+  background: #060912;
+  border: 1px solid #1a1f38;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.7), 0 0 0 1px rgba(124,58,237,0.08);
 }
 .term-bar {
-  background: #151929; padding: 10px 16px; display: flex; align-items: center;
-  gap: 8px; border-bottom: 1px solid var(--border);
+  background: linear-gradient(90deg, #0d1020 0%, #111525 100%);
+  padding: 10px 16px; display: flex; align-items: center;
+  gap: 8px; border-bottom: 1px solid #1a1f38;
 }
-.term-dot { width: 11px; height: 11px; border-radius: 50%; }
-.term-dot.r { background: #ff5f57; } .term-dot.y { background: #febc2e; } .term-dot.g { background: #28c840; }
-.term-title { color: var(--text-muted); font-size: 12px; margin-left: 10px; font-weight: 500; }
+.term-dot { width: 12px; height: 12px; border-radius: 50%; cursor: default; }
+.term-dot.r { background: #ff5f57; box-shadow: 0 0 6px rgba(255,95,87,0.5); }
+.term-dot.y { background: #febc2e; box-shadow: 0 0 6px rgba(254,188,46,0.5); }
+.term-dot.g { background: #28c840; box-shadow: 0 0 6px rgba(40,200,64,0.5); }
+.term-title {
+  color: #3a4060; font-size: 12px; margin-left: 10px; font-weight: 500;
+  letter-spacing: 0.5px; font-family: monospace;
+}
 .term-body {
-  padding: 16px; min-height: 300px; max-height: 450px; overflow-y: auto;
+  padding: 18px 20px; min-height: 300px; max-height: 480px; overflow-y: auto;
   font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
-  font-size: 13px; line-height: 1.7;
+  font-size: 13px; line-height: 1.85; letter-spacing: 0.02em;
+  background: #060912;
 }
-.term-line { color: var(--green); }
-.term-error { color: var(--red); }
-.term-info { color: var(--blue); }
-.term-output { color: var(--text-primary); white-space: pre-wrap; word-break: break-all; }
+.term-body::-webkit-scrollbar { width: 4px; }
+.term-body::-webkit-scrollbar-track { background: transparent; }
+.term-body::-webkit-scrollbar-thumb { background: #1e2440; border-radius: 2px; }
+
+/* Output line types */
+.term-cmd  { color: var(--violet-light); font-weight: 700; }
+.term-line { color: #e2e8f0; }
+.term-error { color: #ff6b6b; text-shadow: 0 0 8px rgba(255,107,107,0.3); }
+.term-info  { color: var(--cyan); }
+.term-success { color: #4ade80; text-shadow: 0 0 8px rgba(74,222,128,0.2); }
+.term-output { color: #c8d0e8; white-space: pre-wrap; word-break: break-all; }
+.term-dim { color: #3a4060; }
+
+/* Highlight patterns in output */
+.term-ip    { color: var(--cyan-bright); font-weight: 600; }
+.term-flag  { color: #ffd700; font-weight: 700; text-shadow: 0 0 10px rgba(255,215,0,0.4); }
+.term-path  { color: #a78bfa; }
+
 .term-input-row {
-  display: flex; align-items: center; padding: 10px 16px;
-  background: #0a0d18; border-top: 1px solid var(--border);
+  display: flex; align-items: center; padding: 10px 20px;
+  background: #080b16;
+  border-top: 1px solid #1a1f38;
+  transition: border-color 0.2s;
+}
+.term-input-row:focus-within {
+  border-top-color: rgba(124,58,237,0.4);
+  background: #090c18;
 }
 .term-prompt {
-  color: var(--accent-light); font-family: monospace; font-size: 13px;
-  margin-right: 8px; white-space: nowrap; font-weight: 600;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 13px; margin-right: 10px; white-space: nowrap; font-weight: 700;
+  color: var(--violet-light);
+  text-shadow: 0 0 12px rgba(167,139,250,0.4);
+  letter-spacing: 0.02em;
 }
 .term-input {
-  flex: 1; background: none; border: none; color: var(--text-primary);
-  font-family: monospace; font-size: 13px; outline: none; caret-color: var(--accent-light);
+  flex: 1; background: none; border: none;
+  color: #e2e8f0;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 13px; outline: none;
+  caret-color: var(--violet-light);
+  letter-spacing: 0.02em;
 }
+.term-input::placeholder { color: #2a3050; }
 
 /* ══════ QUICK ACTIONS ══════ */
 .quick-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
@@ -632,26 +669,24 @@ tr.clickable { cursor: pointer; }
           <span class="term-title" id="term-title">Phantom C2 — Select an agent to begin</span>
         </div>
         <div class="term-body" id="term-body">
-          <div class="term-info" style="color:var(--accent-light);font-weight:700;font-size:14px;letter-spacing:0.5px">
-            ╔══════════════════════════════════════════════════════════╗
-          </div>
-          <div class="term-info" style="color:var(--accent-light);font-weight:700;font-size:14px">
-            ║&nbsp;&nbsp;PHANTOM C2 — Interactive Terminal&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;║
-          </div>
-          <div class="term-info" style="color:var(--accent-light);font-weight:700;font-size:14px;letter-spacing:0.5px">
-            ╚══════════════════════════════════════════════════════════╝
-          </div>
-          <div class="term-info" style="margin-top:8px;color:var(--text-muted)">Select an agent above to begin. Type <span style="color:var(--cyan)">help</span> for all commands.</div>
-          <div>&nbsp;</div>
-          <div class="term-info" style="color:var(--green)">⚡ Quick Commands</div>
-          <div class="term-info" style="color:var(--text-muted);font-size:12px;line-height:1.8">
-            <span style="color:var(--cyan)">shell</span> &lt;cmd&gt; &nbsp;│&nbsp; <span style="color:var(--cyan)">sysinfo</span> &nbsp;│&nbsp; <span style="color:var(--cyan)">ifconfig</span> &nbsp;│&nbsp; <span style="color:var(--cyan)">ps</span> &nbsp;│&nbsp; <span style="color:var(--cyan)">screenshot</span> &nbsp;│&nbsp; <span style="color:var(--cyan)">download</span> &lt;path&gt;
-          </div>
-          <div class="term-info" style="color:var(--text-muted);font-size:12px;line-height:1.8">
-            <span style="color:var(--cyan)">upload</span> &nbsp;│&nbsp; <span style="color:var(--cyan)">persist</span> &nbsp;│&nbsp; <span style="color:var(--cyan)">sleep</span> &nbsp;│&nbsp; <span style="color:var(--cyan)">token</span> &nbsp;│&nbsp; <span style="color:var(--cyan)">keylog</span> &nbsp;│&nbsp; <span style="color:var(--cyan)">creds</span> &nbsp;│&nbsp; <span style="color:var(--cyan)">evasion</span>
-          </div>
-          <div class="term-info" style="color:var(--text-muted);font-size:12px;line-height:1.8">
-            <span style="color:var(--cyan)">socks</span> start/stop/list &nbsp;│&nbsp; <span style="color:var(--cyan)">portfwd</span> &nbsp;│&nbsp; <span style="color:var(--cyan)">pivot</span> &nbsp;│&nbsp; <span style="color:var(--cyan)">lateral</span> &nbsp;│&nbsp; <span style="color:var(--cyan)">ad-*</span> (22 AD cmds)
+          <div class="term-dim">┌─────────────────────────────────────────────────────┐</div>
+          <div><span class="term-dim">│</span>  <span class="term-prompt" style="margin:0;text-shadow:none">PHANTOM C2</span> <span class="term-dim">— Interactive Terminal                   │</span></div>
+          <div class="term-dim">└─────────────────────────────────────────────────────┘</div>
+          <div style="margin-top:10px"><span class="term-dim">→ </span><span class="term-output">Select an agent above, then type </span><span class="term-info">help</span><span class="term-output"> for all commands.</span></div>
+          <div style="margin-top:10px;margin-bottom:4px"><span class="term-info">⚡</span> <span class="term-output" style="color:#4a5080;font-size:12px">Quick reference</span></div>
+          <div style="font-size:12px;color:#2e3555;line-height:2">
+            <span class="term-info">shell</span><span style="color:#2e3555"> &lt;cmd&gt;</span>
+            <span style="color:#1e2440"> · </span><span class="term-info">sysinfo</span>
+            <span style="color:#1e2440"> · </span><span class="term-info">ifconfig</span>
+            <span style="color:#1e2440"> · </span><span class="term-info">ps</span>
+            <span style="color:#1e2440"> · </span><span class="term-info">screenshot</span>
+            <span style="color:#1e2440"> · </span><span class="term-info">download</span><span style="color:#2e3555"> &lt;path&gt;</span>
+            <span style="color:#1e2440"> · </span><span class="term-info">creds</span>
+            <span style="color:#1e2440"> · </span><span class="term-info">persist</span>
+            <span style="color:#1e2440"> · </span><span class="term-info">evasion</span>
+            <span style="color:#1e2440"> · </span><span class="term-info">socks</span>
+            <span style="color:#1e2440"> · </span><span class="term-info">pivot</span>
+            <span style="color:#1e2440"> · </span><span class="term-info">ad-*</span>
           </div>
           <div>&nbsp;</div>
         </div>
@@ -1795,13 +1830,24 @@ function termLog(type, text) {
   const body = document.getElementById('term-body');
   const div = document.createElement('div');
   div.className = 'term-' + (type || 'output');
-  if (type === 'output' || type === 'success') {
+  if (type === 'line') {
+    // Command echo — styled as prompt + command
+    div.innerHTML = '<span style="color:#3a3060;user-select:none">❯ </span><span class="term-cmd">' + escHtml(text.replace(/^❯ /, '')) + '</span>';
+  } else if (type === 'output' || type === 'success') {
     div.innerHTML = colorizeOutput(text);
+  } else if (type === 'error') {
+    div.innerHTML = '<span style="color:#2e1a1a;user-select:none">✗ </span><span class="term-error">' + escHtml(text.replace(/^✗ /, '')) + '</span>';
+  } else if (type === 'info') {
+    div.innerHTML = '<span class="term-info">' + escHtml(text) + '</span>';
   } else {
     div.textContent = text;
   }
   body.appendChild(div);
   body.scrollTop = body.scrollHeight;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 async function sendTermCmd() {
@@ -1815,7 +1861,7 @@ async function sendTermCmd() {
   document.getElementById('agent-select').value = agent;
 
   cmdHistory.push(raw); historyIdx = cmdHistory.length;
-  termLog('line', '❯ ' + raw);
+  termLog('line', raw);
 
   const parts = raw.split(/\s+/);
   let cmd = parts[0].toLowerCase(), args = parts.slice(1).join(' ');
