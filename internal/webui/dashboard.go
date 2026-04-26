@@ -2664,14 +2664,16 @@ function populateListenerSelector() {
   if (!sel) return;
   const cur = sel.value;
   let opts = '<option value="">-- Select a listener or preset --</option>';
+  const host = window.location.hostname;
 
   // Add running listeners
   if (window._cachedListeners && window._cachedListeners.length > 0) {
     opts += '<optgroup label="Active Listeners">';
     window._cachedListeners.forEach(l => {
       if (l.status === 'running') {
-        const proto = l.type === 'HTTPS' ? 'https' : 'http';
-        const url = proto + '://' + l.bind;
+        const proto = (l.type||'').toLowerCase() === 'https' ? 'https' : 'http';
+        const bind = (l.bind||'').replace('0.0.0.0', host);
+        const url = proto + '://' + bind;
         opts += '<option value="'+url+'">'+l.name+' ('+url+')</option>';
       }
     });
@@ -2682,8 +2684,9 @@ function populateListenerSelector() {
   if (window._cachedPresets && window._cachedPresets.length > 0) {
     opts += '<optgroup label="Saved Presets">';
     window._cachedPresets.forEach(p => {
-      const proto = p.type === 'https' ? 'https' : 'http';
-      const url = proto + '://' + p.bind;
+      const proto = (p.type||'http').toLowerCase() === 'https' ? 'https' : 'http';
+      const bind = (p.bind||'').replace('0.0.0.0', host);
+      const url = proto + '://' + bind;
       opts += '<option value="'+url+'">💾 '+p.name+' ('+url+')</option>';
     });
     opts += '</optgroup>';
@@ -2691,6 +2694,17 @@ function populateListenerSelector() {
 
   sel.innerHTML = opts;
   if (cur) sel.value = cur;
+
+  // Auto-fill URL if only one running listener and field is empty
+  if (!cur && window._cachedListeners) {
+    const running = window._cachedListeners.filter(l => l.status === 'running');
+    if (running.length === 1) {
+      const proto = (running[0].type||'').toLowerCase() === 'https' ? 'https' : 'http';
+      const bind = (running[0].bind||'').replace('0.0.0.0', host);
+      const urlEl = document.getElementById('pl-url');
+      if (urlEl && !urlEl.value) urlEl.value = proto + '://' + bind;
+    }
+  }
 }
 
 // ──── Payload Generator — type card system ────
@@ -2746,6 +2760,8 @@ function plCategory(cat) {
     '<span class="pt-badge" style="background:' + t.bc + ';color:' + t.btc + '">' + t.badge + '</span>' +
     '</div>'
   ).join('');
+  // Preload app templates when Mobile tab is opened
+  if (cat === 'mobile') loadAppTemplates();
 }
 
 function plSelectType(val) {
@@ -2815,13 +2831,32 @@ function onPayloadTypeChange() {
 
 async function loadAppTemplates() {
   const sel = document.getElementById('pl-app-template');
+  if (!sel) return;
+  if (window._appTemplatesLoaded && sel.options.length > 1) return; // already loaded
+
+  sel.innerHTML = '<option>Loading templates...</option>';
   try {
-    const templates = await fetchJ('/api/payload/apps');
-    sel.innerHTML = templates.map(t =>
-      '<option value="'+t.name+'">'+t.icon+' '+t.display+' ('+t.category+', '+t.perms+' perms)</option>'
-    ).join('');
+    const resp = await fetch('/api/payload/apps');
+    if (!resp.ok) { sel.innerHTML = '<option>⚠ Auth required — refresh page</option>'; return; }
+    const templates = await resp.json();
+    if (!Array.isArray(templates) || templates.length === 0) {
+      sel.innerHTML = '<option>⚠ No templates found</option>'; return;
+    }
+    // Group by category
+    const cats = {};
+    templates.forEach(t => { (cats[t.category] = cats[t.category]||[]).push(t); });
+    let html = '';
+    Object.keys(cats).sort().forEach(cat => {
+      html += '<optgroup label="── '+cat+' ──">';
+      cats[cat].forEach(t => {
+        html += '<option value="'+t.name+'">'+t.icon+' '+t.display+' ('+t.perms+' perms)</option>';
+      });
+      html += '</optgroup>';
+    });
+    sel.innerHTML = html;
+    window._appTemplatesLoaded = true;
   } catch(e) {
-    sel.innerHTML = '<option>Failed to load templates</option>';
+    sel.innerHTML = '<option>⚠ Failed: '+e.message+'</option>';
   }
 }
 
