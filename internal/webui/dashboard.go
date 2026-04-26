@@ -1593,7 +1593,7 @@ async function refreshAll() {
   populateListenerSelector();
   populateBackdoorListeners();
   bdTypeChanged();
-  plCategory('agent');
+  if (!window._plCategoryInit) { window._plCategoryInit = true; plCategory('agent'); }
   loadBinaryList();
   const tasks = await fetchJ('/api/tasks');
   const events = await fetchJ('/api/events') || [];
