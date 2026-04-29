@@ -1957,6 +1957,7 @@ async function sendTermCmd() {
       const displayPort = bind.split(':').pop();
       try {
         const resp = await fetch('/api/tunnel/start', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({agent, bind}) });
+        if (resp.status === 401) { termLog('error', '✗ Session expired — refresh the page and log in again'); return; }
         const data = await resp.json();
         if (data.error) { termLog('error', '✗ ' + data.error); }
         else { termLog('success', data.message); termLog('info', 'Configure proxychains: socks5 ' + bind.split(':')[0] + ' ' + displayPort); }
@@ -1966,6 +1967,7 @@ async function sendTermCmd() {
     if (sub === 'stop') {
       try {
         const resp = await fetch('/api/tunnel/stop?agent=' + encodeURIComponent(agent));
+        if (resp.status === 401) { termLog('error', '✗ Session expired — refresh the page and log in again'); return; }
         const data = await resp.json();
         if (data.error) { termLog('error', '✗ ' + data.error); }
         else { termLog('success', '✓ SOCKS tunnel stopped'); }
@@ -1974,7 +1976,9 @@ async function sendTermCmd() {
     }
     if (sub === 'list' || sub === '') {
       try {
-        const tunnels = await fetchJ('/api/tunnel/list');
+        const resp = await fetch('/api/tunnel/list');
+        if (resp.status === 401) { termLog('error', '✗ Session expired — refresh the page and log in again'); return; }
+        const tunnels = await resp.json();
         if (!tunnels || tunnels.length === 0) { termLog('info', 'No active SOCKS tunnels'); }
         else { tunnels.forEach(t => termLog('output', '  ' + t.agent + ' → ' + t.bind + '  (' + t.connections + ' connections)')); }
       } catch(e) { termLog('error', '✗ ' + e.message); }

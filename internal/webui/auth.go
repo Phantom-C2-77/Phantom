@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -106,6 +107,13 @@ func (wa *WebAuth) AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		// Login pages don't need auth
 		if r.URL.Path == "/login" || r.URL.Path == "/api/login" {
 			next(w, r)
+			return
+		}
+		// API endpoints: return JSON 401 so fetch() gets parseable JSON, not HTML
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			fmt.Fprint(w, `{"error":"session expired — please log in again"}`)
 			return
 		}
 		http.Redirect(w, r, "/login", 302)
